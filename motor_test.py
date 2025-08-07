@@ -170,4 +170,4 @@ while True:
 
     time.sleep(0.001)
     for i in range(motorcount):
-        motor[i].update_quick_data_readout()
+        motor[i].update_quick_data_readout() 

@@ -6,7 +6,7 @@ Combines ball detection with motor control for competitive play
 
 import sys
 import time
-from camera import RoboCupRobot
+from soccer_robot import SoccerRobot
 
 def main():
     print("=== RoboCup Soccer Robot ===")
@@ -14,7 +14,7 @@ def main():
     
     try:
         # Create and run the robot
-        robot = RoboCupRobot()
+        robot = SoccerRobot()
         print("Robot initialized successfully!")
         print("Starting RoboCup match mode...")
         robot.run()

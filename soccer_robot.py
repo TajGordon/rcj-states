@@ -2,11 +2,12 @@ import cv2
 import numpy as np
 import time
 import math
+import sys
 from steelbar_powerful_bldc_driver import PowerfulBLDCDriver
 import board
 import busio
 
-class RoboCupRobot:
+class SoccerRobot:
     def __init__(self):
         # Camera setup
         self.cap = cv2.VideoCapture(0)
@@ -56,14 +57,30 @@ class RoboCupRobot:
             motor.set_current_limit_foc(65536)  # 1A current limit
             motor.set_id_pid_constants(1500, 200)
             motor.set_iq_pid_constants(1500, 200)
-            motor.set_speed_pid_constants(4e-2, 4e-4, 3e-2)
+            motor.set_speed_pid_constants(4e-2, 4e-4, 3e-2)  # Constants valid for FOC and Robomaster M2006 P36 motor only
             motor.set_position_pid_constants(275, 0, 0)
             motor.set_position_region_boundary(250000)
             motor.set_speed_limit(self.max_speed)
             
-            # Configure for speed control
-            motor.configure_operating_mode_and_sensor(3, 1)  # FOC mode
-            motor.configure_command_mode(12)  # Speed command mode
+            # CALIBRATION STEP - Configure calibration mode
+            motor.configure_operating_mode_and_sensor(15, 1)  # configure calibration mode and sin/cos encoder
+            motor.configure_command_mode(15)  # configure calibration mode
+            motor.set_calibration_options(300, 2097152, 50000, 500000)  # set calibration voltage to 300/3399*vcc volts, speed to 2097152/65536 elecangle/s, settling time to 50000/50000 seconds, calibration time to 500000/50000 seconds
+            
+            # Start calibration
+            motor.start_calibration()  # start the calibration
+            print(f"Starting calibration of motor {i}")
+            while not motor.is_calibration_finished():  # wait for the calibration to finish
+                print(".", end="")
+                sys.stdout.flush()
+                time.sleep(0.5)
+            print()  # print out the calibration results
+            print(f"ELECANGLEOFFSET: {motor.get_calibration_ELECANGLEOFFSET()}")
+            print(f"SINCOSCENTRE: {motor.get_calibration_SINCOSCENTRE()}")
+
+            # Configure for normal operation
+            motor.configure_operating_mode_and_sensor(3, 1)  # configure FOC mode and sin/cos encoder
+            motor.configure_command_mode(12)  # configure speed command mode
             
             self.motors.append(motor)
             self.motor_modes.append(12)
@@ -153,7 +170,7 @@ class RoboCupRobot:
     
     def run(self):
         """Main robot control loop"""
-        print("RoboCup Robot Starting...")
+        print("Soccer Robot Starting...")
         print("Press 'q' to quit, 's' to stop motors")
         
         try:
@@ -192,7 +209,7 @@ class RoboCupRobot:
                     motor.update_quick_data_readout()
                 
                 # Display frame
-                cv2.imshow("RoboCup Robot Vision", frame)
+                cv2.imshow("Soccer Robot Vision", frame)
                 
                 # Handle key presses
                 key = cv2.waitKey(1) & 0xFF
@@ -214,8 +231,8 @@ class RoboCupRobot:
             print("Robot shutdown complete")
 
 def main():
-    robot = RoboCupRobot()
+    robot = SoccerRobot()
     robot.run()
 
 if __name__ == "__main__":
-    main()
+    main() 
