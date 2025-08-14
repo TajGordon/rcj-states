@@ -6,6 +6,7 @@ import busio
 import select
 from steelbar_powerful_bldc_driver import PowerfulBLDCDriver
 
+# Initialize variables
 motor = [None] * 8
 motormode = [0] * 8
 motorcount = 0
@@ -29,57 +30,58 @@ def read_input():
         return sys.stdin.readline().strip()
     return None
 
+# Initialize I2C
 i2c = busio.I2C(board.SCL, board.SDA)
 
-print("please enter the number of motor drivers you want to control:")
+print("Please enter the number of motor drivers you want to control:")
 tempuint32 = int(input())
 if tempuint32 == 0 or tempuint32 > 8:
-    print("error motor count out of range, please reboot microcontroller to try again.")
+    print("Error motor count out of range, please reboot microcontroller to try again.")
     quit()
 motorcount = tempuint32
 
 setupmotorcount = 0
 while setupmotorcount < motorcount:
-    print(f"please enter the i2c address of motor driver number {setupmotorcount}:")
+    print(f"Please enter the i2c address of motor driver number {setupmotorcount}:")
     tempuint32 = int(input())
     if tempuint32 <= 7 or tempuint32 >= 120:
-        print("error invalid i2c address, please reboot microcontroller to try again.")
+        print("Error invalid i2c address, please reboot microcontroller to try again.")
         quit()
     motor[setupmotorcount] = PowerfulBLDCDriver(i2c, tempuint32)
     
-    print(f"the firmware version of motor driver number {setupmotorcount} is: {motor[setupmotorcount].get_firmware_version()}")
+    print(f"The firmware version of motor driver number {setupmotorcount} is: {motor[setupmotorcount].get_firmware_version()}")
     if motor[setupmotorcount].get_firmware_version() != 3:
-        print("error unsupported motor driver version, please check for updates, maybe check wiring and i2c configuration, reboot microcontroller to try again.")
+        print("Error unsupported motor driver version, please check for updates, maybe check wiring and i2c configuration, reboot microcontroller to try again.")
         quit()
 
     setupmotorcount += 1
 
 setupmotorcount = 0
 while setupmotorcount < motorcount:
-    motor[setupmotorcount].set_current_limit_foc(65536)
+    motor[setupmotorcount].set_current_limit_foc(65536)  # set current limit to 1 amp (only works in FOC mode)
     motor[setupmotorcount].set_id_pid_constants(1500, 200)
     motor[setupmotorcount].set_iq_pid_constants(1500, 200)
-    motor[setupmotorcount].set_speed_pid_constants(4e-2, 4e-4, 3e-2)
+    motor[setupmotorcount].set_speed_pid_constants(4e-2, 4e-4, 3e-2)  # Constants valid for FOC and Robomaster M2006 P36 motor only, see tuning constants document for more details
     motor[setupmotorcount].set_position_pid_constants(275, 0, 0)
     motor[setupmotorcount].set_position_region_boundary(250000)
     motor[setupmotorcount].set_speed_limit(10000000)
     
-    motor[setupmotorcount].configure_operating_mode_and_sensor(15, 1)
-    motor[setupmotorcount].configure_command_mode(15)
-    motor[setupmotorcount].set_calibration_options(300, 2097152, 50000, 500000)
+    motor[setupmotorcount].configure_operating_mode_and_sensor(15, 1)  # configure calibration mode and sin/cos encoder
+    motor[setupmotorcount].configure_command_mode(15)  # configure calibration mode
+    motor[setupmotorcount].set_calibration_options(300, 2097152, 50000, 500000)  # set calibration voltage to 300/3399*vcc volts, speed to 2097152/65536 elecangle/s, settling time to 50000/50000 seconds, calibration time to 500000/50000 seconds
     
-    motor[setupmotorcount].start_calibration()
-    print(f"starting calibration of motor {setupmotorcount}")
-    while not motor[setupmotorcount].is_calibration_finished():
+    motor[setupmotorcount].start_calibration()  # start the calibration
+    print(f"Starting calibration of motor {setupmotorcount}")
+    while not motor[setupmotorcount].is_calibration_finished():  # wait for the calibration to finish, do not call any other motor driver functions while calibration is ongoing
         print(".", end="")
         sys.stdout.flush()
         time.sleep(0.5)
-    print()
-    print(f"elecangleoffset: {motor[setupmotorcount].get_calibration_ELECANGLEOFFSET()}")
-    print(f"sincoscentre: {motor[setupmotorcount].get_calibration_SINCOSCENTRE()}")
+    print()  # print out the calibration results
+    print(f"ELECANGLEOFFSET: {motor[setupmotorcount].get_calibration_ELECANGLEOFFSET()}")
+    print(f"SINCOSCENTRE: {motor[setupmotorcount].get_calibration_SINCOSCENTRE()}")
 
-    motor[setupmotorcount].configure_operating_mode_and_sensor(3, 1)
-    motor[setupmotorcount].configure_command_mode(12)
+    motor[setupmotorcount].configure_operating_mode_and_sensor(3, 1)  # configure FOC mode and sin/cos encoder
+    motor[setupmotorcount].configure_command_mode(12)  # configure speed command mode
     motormode[setupmotorcount] = 12
     
     setupmotorcount += 1
@@ -95,31 +97,31 @@ while True:
                 tempuint32 = int(param)
                 if tempuint32 < motorcount:
                     selectedmotor = tempuint32
-                    print(f"selected motor number {selectedmotor}")
+                    print(f"Selected motor number {selectedmotor}")
                 else:
-                    raise ValueError('invalid motor number')
+                    raise ValueError('Invalid motor number')
             except ValueError:
-                print("invalid motor number")
+                print("Invalid motor number")
         if command == 'm' and param:
             try:
                 tempuint32 = int(param)
                 if tempuint32 == 2 or tempuint32 == 12 or tempuint32 == 13:
                     motor[selectedmotor].configure_command_mode(tempuint32)
                     motormode[selectedmotor] = tempuint32
-                    print(f"command mode {tempuint32}")
+                    print(f"Command Mode {tempuint32}")
                 else:
-                    raise ValueError('invalid command mode')
+                    raise ValueError('Invalid command mode')
             except ValueError:
-                print("invalid command mode")
+                print("Invalid command mode")
         elif command == 's' and param:
             try:
                 maxspeed = int(param)
                 motor[selectedmotor].set_speed_limit(abs(maxspeed))
                 if motormode[selectedmotor] == 12:
                     motor[selectedmotor].set_speed(maxspeed)
-                print(f"speed {maxspeed}")
+                print(f"Speed {maxspeed}")
             except ValueError:
-                print("invalid speed value")
+                print("Invalid speed value")
         elif command == 'p' and param:
             try:
                 postarget = float(param)
@@ -128,44 +130,44 @@ while True:
                 if motormode[selectedmotor] == 13:
                     motor[selectedmotor].set_position(posmsb, poslsb)
                 else:
-                    print("motor is not in position mode")
-                print(f"position {postarget}")
+                    print("Motor is not in position mode")
+                print(f"Position {postarget}")
             except ValueError:
-                print("invalid position value")
+                print("Invalid position value")
         elif command == 'c' and param:
             try:
                 currentlimit = int(param)
                 motor[selectedmotor].set_current_limit_foc(abs(currentlimit))
                 if motormode[selectedmotor] == 2:
                     motor[selectedmotor].set_torque(currentlimit)
-                print(f"current (torque) {currentlimit}")
+                print(f"Current (Torque) {currentlimit}")
             except ValueError:
-                print("invalid current value")
+                print("Invalid current value")
         elif command == 'k' and param:
             try:
                 pidconstant = float(param)
                 motor[selectedmotor].set_position_pid_constants(pidconstant, 0, 0)
             except ValueError:
-                print("invalid pid constant value")
+                print("Invalid PID constant value")
         elif command == 'b' and param:
             try:
                 boundary = float(param)
                 motor[selectedmotor].set_position_region_boundary(boundary)
             except ValueError:
-                print("invalid boundary value")
+                print("Invalid boundary value")
         elif command == 'f':
             motor[selectedmotor].clear_faults()
-            print("clear faults")
+            print("Clear Faults")
         elif command == 'd' and param:
             try:
                 tempuint32 = int(param)
-                print(f"delay {tempuint32}")
+                print(f"Delay {tempuint32}")
                 time.sleep(tempuint32 / 1000)
             except ValueError:
-                print("invalid delay value")
+                print("Invalid delay value")
         else:
-            print("unknown command or missing parameter")
+            print("Unknown command or missing parameter")
 
     time.sleep(0.001)
     for i in range(motorcount):
-        motor[i].update_quick_data_readout() 
+        motor[i].update_quick_data_readout()
