@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Robot Camera Viewer</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #1a1a1a;
+            color: white;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        
+        h1 {
+            text-align: center;
+            color: #4CAF50;
+            margin-bottom: 30px;
+        }
+        
+        .camera-container {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+        
+        .camera-feed {
+            border: 3px solid #4CAF50;
+            border-radius: 10px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+            max-width: 100%;
+            height: auto;
+        }
+        
+        .status {
+            background-color: #333;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 20px 0;
+            border-left: 4px solid #4CAF50;
+        }
+        
+        .controls {
+            display: flex;
+            justify-content: center;
+            gap: 15px;
+            margin: 20px 0;
+        }
+        
+        button {
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            transition: background-color 0.3s;
+        }
+        
+        button:hover {
+            background-color: #45a049;
+        }
+        
+        .info-panel {
+            background-color: #2a2a2a;
+            padding: 20px;
+            border-radius: 8px;
+            margin-top: 20px;
+        }
+        
+        .info-item {
+            margin: 10px 0;
+            padding: 5px 0;
+            border-bottom: 1px solid #444;
+        }
+        
+        .info-label {
+            font-weight: bold;
+            color: #4CAF50;
+        }
+        
+        .error {
+            color: #ff6b6b;
+            background-color: #3a1a1a;
+            padding: 10px;
+            border-radius: 5px;
+            margin: 10px 0;
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🤖 Robot Camera Viewer</h1>
+        
+        <div class="status">
+            <strong>Status:</strong> <span id="status">Connecting to camera...</span>
+        </div>
+        
+        <div class="camera-container">
+            <img src="{{ url_for('video_feed') }}" class="camera-feed" alt="Camera Feed" id="cameraFeed">
+        </div>
+        
+        <div class="controls">
+            <button onclick="refreshFeed()">🔄 Refresh Feed</button>
+            <button onclick="toggleFullscreen()">🔍 Fullscreen</button>
+            <button onclick="takeSnapshot()">📸 Take Snapshot</button>
+        </div>
+        
+        <div class="error" id="errorMessage">
+            <strong>Error:</strong> <span id="errorText"></span>
+        </div>
+        
+        <div class="info-panel">
+            <h3>📊 Camera Information</h3>
+            <div class="info-item">
+                <span class="info-label">Resolution:</span> 640x480
+            </div>
+            <div class="info-item">
+                <span class="info-label">Format:</span> RGB888
+            </div>
+            <div class="info-item">
+                <span class="info-label">Frame Rate:</span> ~30 FPS
+            </div>
+            <div class="info-item">
+                <span class="info-label">Ball Detection:</span> Orange objects (HSV: 0-14, 132-255, 61-255)
+            </div>
+            <div class="info-item">
+                <span class="info-label">Crosshair:</span> White cross at frame center
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const cameraFeed = document.getElementById('cameraFeed');
+        const statusElement = document.getElementById('status');
+        const errorElement = document.getElementById('errorMessage');
+        const errorText = document.getElementById('errorText');
+        
+        // Check if camera feed is loading
+        cameraFeed.onload = function() {
+            statusElement.textContent = 'Camera feed active';
+            statusElement.style.color = '#4CAF50';
+            errorElement.style.display = 'none';
+        };
+        
+        cameraFeed.onerror = function() {
+            statusElement.textContent = 'Camera feed error';
+            statusElement.style.color = '#ff6b6b';
+            errorText.textContent = 'Unable to load camera feed. Please check if the camera is connected and the server is running.';
+            errorElement.style.display = 'block';
+        };
+        
+        function refreshFeed() {
+            const timestamp = new Date().getTime();
+            cameraFeed.src = "{{ url_for('video_feed') }}?t=" + timestamp;
+            statusElement.textContent = 'Refreshing feed...';
+            statusElement.style.color = '#ffa500';
+        }
+        
+        function toggleFullscreen() {
+            if (cameraFeed.requestFullscreen) {
+                cameraFeed.requestFullscreen();
+            } else if (cameraFeed.webkitRequestFullscreen) {
+                cameraFeed.webkitRequestFullscreen();
+            } else if (cameraFeed.msRequestFullscreen) {
+                cameraFeed.msRequestFullscreen();
+            }
+        }
+        
+        function takeSnapshot() {
+            const canvas = document.createElement('canvas');
+            const ctx = canvas.getContext('2d');
+            canvas.width = cameraFeed.videoWidth || cameraFeed.naturalWidth;
+            canvas.height = cameraFeed.videoHeight || cameraFeed.naturalHeight;
+            
+            ctx.drawImage(cameraFeed, 0, 0);
+            
+            const link = document.createElement('a');
+            link.download = 'robot_camera_snapshot_' + new Date().getTime() + '.png';
+            link.href = canvas.toDataURL();
+            link.click();
+        }
+        
+        // Auto-refresh every 30 seconds to keep connection alive
+        setInterval(function() {
+            if (cameraFeed.complete && cameraFeed.naturalWidth > 0) {
+                // Feed is working, no need to refresh
+            } else {
+                refreshFeed();
+            }
+        }, 30000);
+    </script>
+</body>
+</html>
+

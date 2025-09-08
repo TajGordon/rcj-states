@@ -94,26 +94,17 @@ class SoccerRobot:
     def detect_ball(self, frame):
         hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
         mask = cv2.inRange(hsv, self.lower_orange, self.upper_orange)
-        
-        kernel = np.ones((5,5), np.uint8)
-        mask = cv2.morphologyEx(mask, cv2.MORPH_OPEN, kernel)
-        mask = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, kernel)
-        
-        contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-        
-        valid_contours = []
+        contours, _ = cv2.findContours(mask, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+
         for contour in contours:
-            area = cv2.contourArea(contour)
-            if 0 < area < 5000000:
-                print(f"Contour area: {area}")
-                perimeter = cv2.arcLength(contour, True)
-                if perimeter > 0:
-                    circularity = 4 * np.pi * area / (perimeter * perimeter)
-                    if circularity > 0.6:
-                        valid_contours.append(contour)
-        
-        if valid_contours:
-            largest_contour = max(valid_contours, key=cv2.contourArea)
+            print(f"Contour Area: {cv2.contourArea(contour)}")
+
+        filtered_contours = [x for x in contours if cv2.contourArea(x) > 100 and cv2.contourArea(x) < 30000]
+
+        contours = filtered_contours
+
+        if contours:
+            largest_contour = max(contours, key=cv2.contourArea)
             (x, y), radius = cv2.minEnclosingCircle(largest_contour)
             
             self.ball_center_x = int(x)
@@ -187,8 +178,6 @@ class SoccerRobot:
             while True:
                 # Capture frame from Pi Camera
                 frame = self.picam2.capture_array()
-                # Convert from RGB to BGR for OpenCV
-                frame = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
                 
                 ball_found, ball_center, ball_radius = self.detect_ball(frame)
                 
