@@ -2,8 +2,8 @@ import cv2
 import numpy as np
  
 def main():
-    lower_bound = np.array([5,200,70])
-    upper_bound = np.array([18,255,255])
+    lower_bound = np.array([0,132,61])
+    upper_bound = np.array([14,255,255])
  
     cap = cv2.VideoCapture(0)
  

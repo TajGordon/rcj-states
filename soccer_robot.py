@@ -6,16 +6,29 @@ import sys
 from steelbar_powerful_bldc_driver import PowerfulBLDCDriver
 import board
 import busio
+from picamera2 import Picamera2
 
 class SoccerRobot:
     def __init__(self):
-        self.cap = cv2.VideoCapture(0)
-        self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
-        self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
-        self.cap.set(cv2.CAP_PROP_FPS, 30)
+        # Initialize Pi Camera
+        self.picam2 = Picamera2()
+        self.picam2.configure(self.picam2.create_video_configuration(
+            main={"size": (640, 480), "format": "RGB888"}
+        ))
+        self.picam2.start()
         
-        self.lower_orange = np.array([5, 150, 100])
-        self.upper_orange = np.array([18, 255, 255])
+        # Create a dummy cap object for compatibility with existing code
+        self.cap = None
+        
+        self.lower_orange = np.array([0,132,61]) #[0,132,61]
+        self.upper_orange = np.array([14,255,255]) #[14,255,255]
+        
+        # Define speed parameters before setup_motors() is called
+        self.max_speed = 8000000
+        self.turn_speed = 4000000
+        self.forward_speed = 6000000
+        self.kp_turn = 0.8
+        self.kp_forward = 0.6
         
         self.i2c = busio.I2C(board.SCL, board.SDA)
         self.motors = []
@@ -29,14 +42,9 @@ class SoccerRobot:
         self.ball_radius = 0
         self.ball_detected = False
         
-        self.max_speed = 8000000
-        self.turn_speed = 4000000
-        self.forward_speed = 6000000
-        self.kp_turn = 0.8
-        self.kp_forward = 0.6
-        
-    def setup_motors(self):
-        motor_addresses = [10, 11]
+    def setup_motors(self, force_calibration=False):
+        # 4 omniwheels: 26-back, 27-right, 28-front, 30-left
+        motor_addresses = [26, 27, 28, 30]
         
         for i, addr in enumerate(motor_addresses):
             motor = PowerfulBLDCDriver(self.i2c, addr)
@@ -57,15 +65,23 @@ class SoccerRobot:
             motor.configure_command_mode(15)
             motor.set_calibration_options(300, 2097152, 50000, 500000)
             
-            motor.start_calibration()
-            print(f"starting calibration of motor {i}")
-            while not motor.is_calibration_finished():
-                print(".", end="")
-                sys.stdout.flush()
-                time.sleep(0.5)
-            print()
-            print(f"elecangleoffset: {motor.get_calibration_ELECANGLEOFFSET()}")
-            print(f"sincoscentre: {motor.get_calibration_SINCOSCENTRE()}")
+            if force_calibration:
+                # Run full calibration
+                motor.start_calibration()
+                print(f"Starting calibration of motor {i}")
+                while not motor.is_calibration_finished():
+                    print(".", end="")
+                    sys.stdout.flush()
+                    time.sleep(0.5)
+                print()
+                print(f"  elecangleoffset: {motor.get_calibration_ELECANGLEOFFSET()}")
+                print(f"  sincoscentre: {motor.get_calibration_SINCOSCENTRE()}")
+            else:
+                # Skip calibration - values are stored internally by the motor driver
+                # The motor driver will use the previously calibrated values automatically
+                print(f"Motor {i}: Using previously calibrated values (stored internally)")
+                print(f"  elecangleoffset: {motor.get_calibration_ELECANGLEOFFSET()}")
+                print(f"  sincoscentre: {motor.get_calibration_SINCOSCENTRE()}")
 
             motor.configure_operating_mode_and_sensor(3, 1)
             motor.configure_command_mode(12)
@@ -88,7 +104,8 @@ class SoccerRobot:
         valid_contours = []
         for contour in contours:
             area = cv2.contourArea(contour)
-            if 500 < area < 50000:
+            if 0 < area < 5000000:
+                print(f"Contour area: {area}")
                 perimeter = cv2.arcLength(contour, True)
                 if perimeter > 0:
                     circularity = 4 * np.pi * area / (perimeter * perimeter)
@@ -110,8 +127,8 @@ class SoccerRobot:
         return False, None, 0
     
     def calculate_motor_commands(self):
-        if not self.ball_detected or len(self.motors) < 2:
-            return 0, 0
+        if not self.ball_detected or len(self.motors) < 4:
+            return [0, 0, 0, 0]
         
         error_x = self.ball_center_x - self.frame_center_x
         error_y = self.frame_center_y - self.ball_center_y
@@ -119,23 +136,44 @@ class SoccerRobot:
         error_x_norm = error_x / self.frame_center_x
         error_y_norm = error_y / self.frame_center_y
         
-        left_speed = self.forward_speed + (error_x_norm * self.turn_speed * self.kp_turn)
-        right_speed = self.forward_speed - (error_x_norm * self.turn_speed * self.kp_turn)
+        # Omniwheel movement calculation
+        # Motors: [back(26), right(27), front(28), left(30)]
+        # For omniwheels: forward/backward affects front/back, left/right affects left/right
+        # Turning affects all wheels in opposite directions
         
-        if abs(error_y_norm) > 0.1:
-            speed_adjustment = error_y_norm * self.forward_speed * self.kp_forward
-            left_speed += speed_adjustment
-            right_speed += speed_adjustment
+        # Base forward movement
+        forward_speed = error_y_norm * self.forward_speed * self.kp_forward
         
-        left_speed = np.clip(left_speed, -self.max_speed, self.max_speed)
-        right_speed = np.clip(right_speed, -self.max_speed, self.max_speed)
+        # Sideways movement (strafing)
+        strafe_speed = error_x_norm * self.forward_speed * self.kp_forward
         
-        return int(left_speed), int(right_speed)
+        # Turning movement
+        turn_speed = error_x_norm * self.turn_speed * self.kp_turn
+        
+        # Calculate individual motor speeds
+        # Back motor (26): forward + turn
+        back_speed = forward_speed + turn_speed
+        
+        # Right motor (27): strafe + turn  
+        right_speed = strafe_speed + turn_speed
+        
+        # Front motor (28): forward - turn
+        front_speed = forward_speed - turn_speed
+        
+        # Left motor (30): strafe - turn
+        left_speed = strafe_speed - turn_speed
+        
+        # Clip speeds to max limits
+        speeds = [back_speed, right_speed, front_speed, left_speed]
+        speeds = [np.clip(speed, -self.max_speed, self.max_speed) for speed in speeds]
+        
+        return [int(speed) for speed in speeds]
     
-    def set_motor_speeds(self, left_speed, right_speed):
-        if len(self.motors) >= 2:
-            self.motors[0].set_speed(left_speed)
-            self.motors[1].set_speed(right_speed)
+    def set_motor_speeds(self, speeds):
+        # speeds: [back(26), right(27), front(28), left(30)]
+        if len(self.motors) >= 4 and len(speeds) >= 4:
+            for i, speed in enumerate(speeds):
+                self.motors[i].set_speed(speed)
     
     def stop_motors(self):
         for motor in self.motors:
@@ -143,57 +181,50 @@ class SoccerRobot:
     
     def run(self):
         print("soccer robot starting...")
-        print("press 'q' to quit, 's' to stop motors")
+        print("press Ctrl+C to quit")
         
         try:
             while True:
-                ret, frame = self.cap.read()
-                if not ret:
-                    print("failed to grab frame")
-                    break
+                # Capture frame from Pi Camera
+                frame = self.picam2.capture_array()
+                # Convert from RGB to BGR for OpenCV
+                frame = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
                 
                 ball_found, ball_center, ball_radius = self.detect_ball(frame)
                 
                 if ball_found:
-                    left_speed, right_speed = self.calculate_motor_commands()
-                    self.set_motor_speeds(left_speed, right_speed)
-                    
-                    cv2.circle(frame, ball_center, ball_radius, (0, 255, 0), 2)
-                    cv2.circle(frame, ball_center, 5, (0, 0, 255), -1)
-                    
-                    cv2.circle(frame, (self.frame_center_x, self.frame_center_y), 10, (255, 0, 0), 2)
-                    
-                    cv2.putText(frame, f"l:{left_speed//1000}k r:{right_speed//1000}k", 
-                              (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
+                    speeds = self.calculate_motor_commands()
+                    self.set_motor_speeds(speeds)
+                    print(f"Ball found at ({ball_center[0]}, {ball_center[1]}) - speeds: B:{speeds[0]//1000}k R:{speeds[1]//1000}k F:{speeds[2]//1000}k L:{speeds[3]//1000}k")
                 else:
                     self.stop_motors()
-                    cv2.putText(frame, "ball not found", (10, 30), 
-                              cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
+                    print("Ball not found - motors stopped")
                 
                 for motor in self.motors:
                     motor.update_quick_data_readout()
                 
-                cv2.imshow("soccer robot vision", frame)
-                
-                key = cv2.waitKey(1) & 0xFF
-                if key == ord('q'):
-                    break
-                elif key == ord('s'):
-                    self.stop_motors()
-                    print("motors stopped")
-                
-                time.sleep(0.01)
+                time.sleep(0.1)  # Reduced frequency for headless operation
                 
         except KeyboardInterrupt:
             print("shutting down...")
         finally:
             self.stop_motors()
-            self.cap.release()
-            cv2.destroyAllWindows()
+            self.picam2.stop()
             print("robot shutdown complete")
 
 def main():
+    # Set force_calibration=True if you need to recalibrate motors
+    # This is needed for first-time setup or after hardware changes
+    force_calibration = False  # Change to True to force calibration
+    
     robot = SoccerRobot()
+    if force_calibration:
+        print("WARNING: Force calibration is enabled!")
+        print("This will recalibrate all motors and may take several minutes.")
+        print("Only do this if motors aren't working properly or after hardware changes.")
+        input("Press Enter to continue with calibration, or Ctrl+C to cancel...")
+        robot.setup_motors(force_calibration=True)
+    
     robot.run()
 
 if __name__ == "__main__":
