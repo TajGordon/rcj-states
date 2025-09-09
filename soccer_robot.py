@@ -43,8 +43,8 @@ class SoccerRobot:
         self.ball_detected = False
         
     def setup_motors(self, force_calibration=False):
-        # 4 omniwheels: 26-back, 27-right, 28-front, 30-left
-        motor_addresses = [26, 27, 28, 30]
+        # 4 omniwheels: 27-back, 28-right, 30-front, 26-left
+        motor_addresses = [27, 28, 30, 26]
         
         for i, addr in enumerate(motor_addresses):
             motor = PowerfulBLDCDriver(self.i2c, addr)
@@ -127,32 +127,37 @@ class SoccerRobot:
         error_x_norm = error_x / self.frame_center_x
         error_y_norm = error_y / self.frame_center_y
         
-        # Omniwheel movement calculation
-        # Motors: [back(26), right(27), front(28), left(30)]
-        # For omniwheels: forward/backward affects front/back, left/right affects left/right
-        # Turning affects all wheels in opposite directions
-        
-        # Base forward movement
+        # CUSTOM OMNIWHEEL CONFIGURATION
+        # Motors: [back(27), right(28), front(30), left(26)]
+        # IMPORTANT: In this setup:
+        # - Left/Right motors control FORWARD/BACKWARD movement
+        # - Front/Back motors control STRAFING (left/right) movement
+        # - Turning affects all wheels in opposite directions
+        # - Front motor (30) is INVERTED to compensate for hardware wiring
+        # - Left motor (26) is INVERTED to compensate for hardware wiring
+
+        # Base forward movement (uses left/right motors)
         forward_speed = error_y_norm * self.forward_speed * self.kp_forward
-        
-        # Sideways movement (strafing)
+
+        # Sideways movement (strafing, uses front/back motors)
         strafe_speed = error_x_norm * self.forward_speed * self.kp_forward
-        
+
         # Turning movement
         turn_speed = error_x_norm * self.turn_speed * self.kp_turn
-        
+
         # Calculate individual motor speeds
-        # Back motor (26): forward + turn
-        back_speed = forward_speed + turn_speed
-        
-        # Right motor (27): strafe + turn  
-        right_speed = strafe_speed + turn_speed
-        
-        # Front motor (28): forward - turn
-        front_speed = forward_speed - turn_speed
-        
-        # Left motor (30): strafe - turn
-        left_speed = strafe_speed - turn_speed
+        # For pure spinning: opposite motors move in opposite directions
+        # Back motor (27): strafe - turn (moves left during clockwise spin)
+        back_speed = strafe_speed - turn_speed
+
+        # Right motor (28): forward - turn (moves backward during clockwise spin)
+        right_speed = forward_speed - turn_speed
+
+        # Front motor (30): strafe + turn (INVERTED, moves right during clockwise spin)
+        front_speed = -(strafe_speed + turn_speed)
+
+        # Left motor (26): forward + turn (INVERTED, moves forward during clockwise spin)
+        left_speed = -(forward_speed + turn_speed)
         
         # Clip speeds to max limits
         speeds = [back_speed, right_speed, front_speed, left_speed]
@@ -161,7 +166,7 @@ class SoccerRobot:
         return [int(speed) for speed in speeds]
     
     def set_motor_speeds(self, speeds):
-        # speeds: [back(26), right(27), front(28), left(30)]
+        # speeds: [back(27), right(28), front(30), left(26)]
         if len(self.motors) >= 4 and len(speeds) >= 4:
             for i, speed in enumerate(speeds):
                 self.motors[i].set_speed(speed)
