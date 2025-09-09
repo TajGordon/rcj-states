@@ -24,11 +24,11 @@ class SoccerRobot:
         self.upper_orange = np.array([14,255,255]) #[14,255,255]
         
         # Define speed parameters before setup_motors() is called
-        self.max_speed = 8000000
-        self.turn_speed = 4000000
-        self.forward_speed = 6000000
-        self.kp_turn = 0.8
-        self.kp_forward = 0.6
+        self.max_speed = 15000000  # Increased from 10M to 15M
+        self.turn_speed = 9000000
+        self.forward_speed = 10000000
+        self.kp_turn = 1.0  # Increased from 0.8 to 1.0 for more responsive turning
+        self.kp_forward = 0.8  # Increased from 0.6 to 0.8 for more responsive forward movement
         
         self.i2c = busio.I2C(board.SCL, board.SDA)
         self.motors = []
@@ -72,7 +72,7 @@ class SoccerRobot:
                 while not motor.is_calibration_finished():
                     print(".", end="")
                     sys.stdout.flush()
-                    time.sleep(0.5)
+                    time.sleep(0.001)
                 print()
                 print(f"  elecangleoffset: {motor.get_calibration_ELECANGLEOFFSET()}")
                 print(f"  sincoscentre: {motor.get_calibration_SINCOSCENTRE()}")
