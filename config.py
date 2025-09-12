@@ -13,7 +13,7 @@ if hostname == 'storm':
     # ELECANGLEOFFSET = {25: 1452253440, 26: 1167990784, 27: 1478825728, 29: 1547735552}
     """ tof stuff """
     tof_count = 8
-    tof_addresses = [80, 88, 94, 91, 95, 93, 92, 86]
+    tof_addresses = [80, 88, 94, 91, 95, 93, 92, 90]
     tof_enabled = {80: True, 88: True, 94: True, 91: True, 95: False, 93: True, 92: True, 86: True} # my back one is covered so disable it
     tof_angles = { # address -> radians, radians from north, starting at 0 and going clockwise
         80: 0, 
