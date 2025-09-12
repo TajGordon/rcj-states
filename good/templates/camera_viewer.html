@@ -207,6 +207,7 @@
             <button onclick="toggleFullscreen()">🔍 Fullscreen</button>
             <button onclick="takeSnapshot()">📸 Take Snapshot</button>
             <button onclick="reconnectCamera()" id="reconnectBtn" disabled>🔌 Reconnect Camera</button>
+            <button onclick="checkCalibrationStatus()" id="calibrationBtn">🎯 Check Calibration</button>
         </div>
         
         <div class="error" id="errorMessage">
@@ -227,6 +228,14 @@
                 <div class="info-item">
                     <span class="info-label">Status:</span>
                     <span class="info-value" id="cameraStatus">Unknown</span>
+                </div>
+                <div class="info-item">
+                    <span class="info-label">Fisheye Correction:</span>
+                    <span class="info-value" id="undistortStatus">Unknown</span>
+                </div>
+                <div class="info-item">
+                    <span class="info-label">Detection Mode:</span>
+                    <span class="info-value" id="detectionMode">Unknown</span>
                 </div>
                 <div class="info-item">
                     <span class="info-label">Last Update:</span>
@@ -293,6 +302,9 @@
         const ballAngleRad = document.getElementById('ballAngleRad');
         const ballAngleDeg = document.getElementById('ballAngleDeg');
         const angleRange = document.getElementById('angleRange');
+        const undistortStatus = document.getElementById('undistortStatus');
+        const detectionMode = document.getElementById('detectionMode');
+        const calibrationBtn = document.getElementById('calibrationBtn');
         
         let isConnected = false;
         let socket;
@@ -375,6 +387,9 @@
             cameraResolution.textContent = `${data.width}x${data.height}`;
             cameraFPS.textContent = `${data.fps} FPS`;
             cameraStatus.textContent = data.is_running ? 'Running' : 'Stopped';
+            undistortStatus.textContent = data.undistort_enabled ? 'Enabled' : 'Disabled';
+            undistortStatus.className = data.undistort_enabled ? 'ball-detected' : 'ball-not-detected';
+            detectionMode.textContent = data.detection_mode || 'Unknown';
             lastUpdate.textContent = new Date().toLocaleTimeString();
         }
         
@@ -429,6 +444,47 @@
             if (socket) {
                 socket.emit('request_data');
             }
+        }
+        
+        function checkCalibrationStatus() {
+            fetch('/api/calibration_status')
+                .then(response => response.json())
+                .then(data => {
+                    if (data.error) {
+                        console.error('Calibration status error:', data.error);
+                        return;
+                    }
+                    
+                    if (data.calibration_needed) {
+                        alert('⚠️ No camera calibration found!\n\n' +
+                              'Options to improve ball detection:\n\n' +
+                              '🎯 Option 1 - Gridbook Calibration (Recommended):\n' +
+                              '• Run: python calibrate_gridbook.py\n' +
+                              '• Use any grid pattern (gridbook, graph paper, ruler)\n' +
+                              '• More flexible than chessboard\n\n' +
+                              '🎯 Option 2 - Chessboard Calibration:\n' +
+                              '• Run: python calibrate_camera.py\n' +
+                              '• Requires printed chessboard pattern\n\n' +
+                              '🎯 Option 3 - Enhanced Detection (No calibration):\n' +
+                              '• Current mode: ' + (data.detection_mode || 'unknown') + '\n' +
+                              '• Uses edge compensation for fisheye distortion\n' +
+                              '• Works without calibration but less accurate\n\n' +
+                              'Restart the camera server after calibration.');
+                    } else if (data.calibration_file_exists) {
+                        alert('✅ Camera calibration found!\n\n' +
+                              'Fisheye correction: ' + (data.undistort_enabled ? 'Enabled' : 'Disabled') + '\n' +
+                              'Detection mode: ' + (data.detection_mode || 'unknown') + '\n\n' +
+                              'Ball detection should be accurate with corrected distortion.');
+                    } else {
+                        alert('❓ Calibration status unknown.\n\n' +
+                              'Detection mode: ' + (data.detection_mode || 'unknown') + '\n' +
+                              'Please check the server logs for more information.');
+                    }
+                })
+                .catch(error => {
+                    console.error('Error checking calibration status:', error);
+                    alert('Error checking calibration status. Please check the server logs.');
+                });
         }
         
         // Camera feed event handlers
