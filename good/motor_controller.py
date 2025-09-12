@@ -9,7 +9,7 @@ from steelbar_powerful_bldc_driver import PowerfulBLDCDriver
 import config
 
 class MotorController:
-    def __init__(self, force_calibration=False):
+    def __init__(self, force_calibration=False, i2c=None):
         # Motor configuration
         self.max_speed = 50_000_000  # Maximum speed for all movements
         self.max_current = 4 * 65536  # 4A current limit (4 * 65536 for the driver)
@@ -27,7 +27,10 @@ class MotorController:
         }
         
         # Initialize I2C and motors
-        self.i2c = busio.I2C(board.SCL, board.SDA)
+        if i2c is None:
+            self.i2c = busio.I2C(board.SCL, board.SDA)
+        else:
+            self.i2c = i2c
         self.motors = []
         self.motor_modes = []
         self.current_heading = 0.0  # Current robot heading for relative movement

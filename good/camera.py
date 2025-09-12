@@ -348,6 +348,34 @@ class Camera:
         else:
             return 0.0
     
+    def get_ball_distance_from_center(self):
+        """
+        Get the distance of the ball from the camera center in pixels.
+        
+        Returns:
+            float: Distance in pixels from camera center to ball center, or 0.0 if no ball detected
+        """
+        if not self.is_running:
+            return 0.0
+            
+        with self.ball_detected.get_lock():
+            detected = self.ball_detected.value
+            
+        if detected:
+            with self.ball_position.get_lock():
+                ball_x = self.ball_position[0]
+                ball_y = self.ball_position[1]
+            
+            # Camera center (from camera_process function)
+            camera_center_x = 320  # 640 / 2
+            camera_center_y = 320  # 640 / 2
+            
+            # Calculate distance using Pythagorean theorem
+            distance = math.sqrt((ball_x - camera_center_x)**2 + (ball_y - camera_center_y)**2)
+            return distance
+        else:
+            return 0.0
+    
     def is_ball_detected(self):
         """
         Check if a ball is currently detected.
@@ -392,6 +420,7 @@ class Camera:
             'ball_position': (ball_x, ball_y),
             'ball_radius': self.get_ball_radius(),
             'ball_angle': self.get_ball_angle(),
+            'ball_distance_from_center': self.get_ball_distance_from_center(),
             'frame_queue_available': self.frame_queue is not None,
             'detection_mode': self.detection_mode
         }

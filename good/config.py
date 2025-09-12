@@ -5,6 +5,7 @@ hostname = socket.gethostname()
 
 if hostname == 'storm':
     print('running on taj\'s bot')
+    target_goal = 'blue'
     # front left: 26, front right: 27, back right: 29, back left: 25
     motor_addresses = [25, 29, 26, 27]
     motor_addresses_named = {'fl': 26, 'fr': 27, 'bl': 25, 'br': 29}
@@ -34,6 +35,44 @@ if hostname == 'storm':
         91: 111.5,
         88: 111.5,
     }
+    
+    # Field dimensions (in mm) - RoboCup Junior field
+    field_width = 2430  
+    field_height = 1820  
+    field_center_x = field_width / 2
+    field_center_y = field_height / 2
+    
+    # Field boundaries (250mm from walls)
+    field_boundary_left = 250
+    field_boundary_right = field_width - 250
+    field_boundary_top = 250
+    field_boundary_bottom = field_height - 250
+    
+    # Goal dimensions (from official rules)
+    goal_width = 450  # Internal width
+    goal_depth = 74   # Internal depth (not 140mm as in Rust file)
+    goal_crossbar_height = 140  # Crossbar height above playing surface
+    goal_crossbar_depth = 20    # Maximum crossbar depth
+    goal_center_y = field_height / 2  # Goal is centered vertically
+    goal_distance_from_wall = 250  # Goal is flush with 250mm line from wall
+    
+    # Goal positions (left and right goals)
+    goal_left_x = goal_distance_from_wall
+    goal_right_x = field_width - goal_distance_from_wall
+    
+    # Goal exclusion zones (300mm in front of goal, 900mm wide)
+    goal_exclusion_distance = 300
+    goal_exclusion_width = 900
+    goal_exclusion_half_width = goal_exclusion_width / 2
+    
+    # Goal exclusion zone boundaries
+    goal_left_exclusion_x = goal_left_x + goal_depth + goal_exclusion_distance
+    goal_left_exclusion_y_min = goal_center_y - goal_exclusion_half_width
+    goal_left_exclusion_y_max = goal_center_y + goal_exclusion_half_width
+    
+    goal_right_exclusion_x = goal_right_x - goal_exclusion_distance
+    goal_right_exclusion_y_min = goal_center_y - goal_exclusion_half_width
+    goal_right_exclusion_y_max = goal_center_y + goal_exclusion_half_width
 else:
     print(f'running on {hostname}, using default configuration')
     # Default configuration for development/testing

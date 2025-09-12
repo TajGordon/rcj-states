@@ -7,6 +7,8 @@ import board
 import busio
 import config
 
+# TODO: add some sort of filtering to the readings
+
 READ_REG = 0x10 # address to write to to request data apparently
 
 @dataclass
