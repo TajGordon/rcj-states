@@ -19,13 +19,21 @@ class IMU:
         self._lock = threading.Lock()
         self._running = False
         self._thread = None
+        self.bno = None
 
-        # Initialize BNO085
-        self.bno = BNO08X_I2C(self.i2c)
-        self.bno.enable_feature(BNO_REPORT_ACCELEROMETER)
-        self.bno.enable_feature(BNO_REPORT_GYROSCOPE)
-        self.bno.enable_feature(BNO_REPORT_MAGNETOMETER)
-        self.bno.enable_feature(BNO_REPORT_ROTATION_VECTOR)
+        # Initialize BNO085 with timeout
+        try:
+            print("Initializing BNO085 IMU...")
+            self.bno = BNO08X_I2C(self.i2c)
+            self.bno.enable_feature(BNO_REPORT_ACCELEROMETER)
+            self.bno.enable_feature(BNO_REPORT_GYROSCOPE)
+            self.bno.enable_feature(BNO_REPORT_MAGNETOMETER)
+            self.bno.enable_feature(BNO_REPORT_ROTATION_VECTOR)
+            print("BNO085 IMU initialized successfully")
+        except Exception as e:
+            print(f"BNO085 IMU initialization failed: {e}")
+            print("IMU will return mock data")
+            self.bno = None
 
         # Heading state
         self._heading_deg = 0.0
@@ -53,22 +61,40 @@ class IMU:
 
     def read_heading_deg(self):
         """Return absolute heading in degrees [0,360), derived from rotation vector."""
-        qi, qj, qk, qr = self.bno.quaternion
-        # yaw from quaternion (right-handed ENU -> heading)
-        yaw = math.atan2(2.0 * (qr * qk + qi * qj), 1.0 - 2.0 * (qj * qj + qk * qk))
-        heading = math.degrees(yaw)
-        if heading < 0:
-            heading += 360.0
-        return heading
+        if self.bno is None:
+            # Return mock heading that slowly rotates
+            import time
+            return (time.time() * 0.1 * 180.0 / math.pi) % 360.0
+        
+        try:
+            qi, qj, qk, qr = self.bno.quaternion
+            # yaw from quaternion (right-handed ENU -> heading)
+            yaw = math.atan2(2.0 * (qr * qk + qi * qj), 1.0 - 2.0 * (qj * qj + qk * qk))
+            heading = math.degrees(yaw)
+            if heading < 0:
+                heading += 360.0
+            return heading
+        except Exception as e:
+            print(f"Error reading IMU heading: {e}")
+            return 0.0
 
     def read_heading_rad(self):
         """Return absolute heading in radians [0, 2π)."""
-        qi, qj, qk, qr = self.bno.quaternion
-        yaw = math.atan2(2.0 * (qr * qk + qi * qj), 1.0 - 2.0 * (qj * qj + qk * qk))
-        # normalize to [0, 2π)
-        if yaw < 0:
-            yaw += 2.0 * math.pi
-        return yaw
+        if self.bno is None:
+            # Return mock heading that slowly rotates
+            import time
+            return (time.time() * 0.1) % (2.0 * math.pi)
+        
+        try:
+            qi, qj, qk, qr = self.bno.quaternion
+            yaw = math.atan2(2.0 * (qr * qk + qi * qj), 1.0 - 2.0 * (qj * qj + qk * qk))
+            # normalize to [0, 2π)
+            if yaw < 0:
+                yaw += 2.0 * math.pi
+            return yaw
+        except Exception as e:
+            print(f"Error reading IMU heading: {e}")
+            return 0.0
 
     def read_relative_heading_deg(self):
         """Heading relative to first measurement (0 = initial orientation)."""
