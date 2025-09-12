@@ -61,6 +61,8 @@ class LocalizationStream:
                 while self.running:
                     pairs = tof.get_localization_pairs(fresh=False)
                     theta = imu.read_heading_rad()
+                    
+                    print(f"Debug: pairs={len(pairs)}, theta={theta:.3f}")
 
                     rays = [
                         {"angle_rad": a, "distance_mm": d}
@@ -85,6 +87,7 @@ class LocalizationStream:
             self._run_mock()
 
     def _run_mock(self):
+        print("Running mock localization stream")
         t = 0.0
         pose = {"x_mm": 1215.0, "y_mm": 910.0, "theta_rad": 0.0}
         angles = [0, math.radians(35), math.radians(90), math.radians(125), math.radians(180), math.radians(215), math.radians(270), math.radians(305)]
