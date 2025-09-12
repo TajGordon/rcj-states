@@ -73,7 +73,7 @@
                 if (!r || r.distance_mm === undefined || r.angle_rad === undefined || r.angle_rad === null) return;
                 if (r.distance_mm <= 0) return;
                 const d = r.distance_mm * pxPerMm;
-                const ang = r.angle_rad; // already radians, clockwise from north per config
+                const ang = r.angle_rad; // already radians, counter-clockwise from north per config
 
                 // Convert to canvas coordinates: x = sin(theta), y = -cos(theta)
                 const dx = Math.sin(ang) * d;

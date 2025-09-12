@@ -60,7 +60,8 @@ class ToFStream:
             # mock stream for development on non-hardware machines
             import math
             t = 0.0
-            angles = [0, math.radians(35), math.radians(90), math.radians(125), math.radians(180), math.radians(215), math.radians(270), math.radians(305)]
+            # Updated angles to match config.py (counter-clockwise from north)
+            angles = [0, math.radians(55), math.radians(90), math.radians(145), math.radians(180), math.radians(235), math.radians(270), math.radians(325)]
             while self.running:
                 items = []
                 for i, a in enumerate(angles):

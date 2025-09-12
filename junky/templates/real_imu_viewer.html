@@ -1,0 +1,392 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Real IMU Viewer - Clockwise Angles</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: #333;
+            min-height: 100vh;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            overflow: hidden;
+        }
+        
+        .header {
+            background: linear-gradient(135deg, #2c3e50 0%, #34495e 100%);
+            color: white;
+            padding: 20px;
+            text-align: center;
+        }
+        
+        .header h1 {
+            margin: 0;
+            font-size: 2.5em;
+            font-weight: 300;
+        }
+        
+        .header p {
+            margin: 10px 0 0 0;
+            opacity: 0.8;
+            font-size: 1.1em;
+        }
+        
+        .content {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            padding: 20px;
+        }
+        
+        .panel {
+            background: #f8f9fa;
+            border-radius: 10px;
+            padding: 20px;
+            border-left: 4px solid #3498db;
+        }
+        
+        .panel h2 {
+            margin: 0 0 15px 0;
+            color: #2c3e50;
+            font-size: 1.4em;
+            border-bottom: 2px solid #ecf0f1;
+            padding-bottom: 10px;
+        }
+        
+        .compass {
+            width: 200px;
+            height: 200px;
+            border: 3px solid #34495e;
+            border-radius: 50%;
+            position: relative;
+            margin: 20px auto;
+            background: radial-gradient(circle, #ecf0f1 0%, #bdc3c7 100%);
+        }
+        
+        .compass-needle {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 2px;
+            height: 80px;
+            background: #e74c3c;
+            transform-origin: bottom center;
+            transform: translate(-50%, -100%);
+            border-radius: 1px;
+            box-shadow: 0 0 10px rgba(231, 76, 60, 0.5);
+        }
+        
+        .compass-needle::after {
+            content: '';
+            position: absolute;
+            top: -10px;
+            left: -3px;
+            width: 8px;
+            height: 8px;
+            background: #e74c3c;
+            border-radius: 50%;
+        }
+        
+        .compass-labels {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+        }
+        
+        .compass-label {
+            position: absolute;
+            font-weight: bold;
+            color: #2c3e50;
+            font-size: 14px;
+        }
+        
+        .north { top: 5px; left: 50%; transform: translateX(-50%); }
+        .east { right: 5px; top: 50%; transform: translateY(-50%); }
+        .south { bottom: 5px; left: 50%; transform: translateX(-50%); }
+        .west { left: 5px; top: 50%; transform: translateY(-50%); }
+        
+        .data-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            margin-top: 15px;
+        }
+        
+        .data-item {
+            background: white;
+            padding: 10px;
+            border-radius: 5px;
+            border-left: 3px solid #3498db;
+        }
+        
+        .data-label {
+            font-weight: bold;
+            color: #7f8c8d;
+            font-size: 0.9em;
+            margin-bottom: 5px;
+        }
+        
+        .data-value {
+            font-size: 1.2em;
+            color: #2c3e50;
+            font-family: 'Courier New', monospace;
+        }
+        
+        .status {
+            text-align: center;
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 5px;
+            font-weight: bold;
+        }
+        
+        .status.connected {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        
+        .status.disconnected {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        
+        .status.mock {
+            background: #fff3cd;
+            color: #856404;
+            border: 1px solid #ffeaa7;
+        }
+        
+        .raw-data {
+            background: #2c3e50;
+            color: #ecf0f1;
+            padding: 15px;
+            border-radius: 5px;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9em;
+            max-height: 300px;
+            overflow-y: auto;
+            white-space: pre-wrap;
+        }
+        
+        .angle-info {
+            background: #e8f5e8;
+            border: 1px solid #4caf50;
+            border-radius: 5px;
+            padding: 15px;
+            margin: 15px 0;
+        }
+        
+        .angle-info h3 {
+            margin: 0 0 10px 0;
+            color: #2e7d32;
+        }
+        
+        .angle-info p {
+            margin: 5px 0;
+            color: #388e3c;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🧭 Real IMU Viewer</h1>
+            <p>Counter-Clockwise Angle System - BNO085 IMU Data</p>
+        </div>
+        
+        <div class="content">
+            <div class="panel">
+                <h2>📊 Heading & Compass</h2>
+                <div class="compass">
+                    <div class="compass-needle" id="needle"></div>
+                    <div class="compass-labels">
+                        <div class="compass-label north">N</div>
+                        <div class="compass-label east">E</div>
+                        <div class="compass-label south">S</div>
+                        <div class="compass-label west">W</div>
+                    </div>
+                </div>
+                
+                <div class="data-grid">
+                    <div class="data-item">
+                        <div class="data-label">Heading (Radians)</div>
+                        <div class="data-value" id="heading-rad">0.000</div>
+                    </div>
+                    <div class="data-item">
+                        <div class="data-label">Heading (Degrees)</div>
+                        <div class="data-value" id="heading-deg">0.0°</div>
+                    </div>
+                </div>
+                
+                <div class="angle-info">
+                    <h3>🔄 Counter-Clockwise Angle System</h3>
+                    <p><strong>0° = North</strong> (0 radians)</p>
+                    <p><strong>90° = West</strong> (π/2 radians)</p>
+                    <p><strong>180° = South</strong> (π radians)</p>
+                    <p><strong>270° = East</strong> (3π/2 radians)</p>
+                </div>
+            </div>
+            
+            <div class="panel">
+                <h2>📈 Sensor Data</h2>
+                <div class="data-grid">
+                    <div class="data-item">
+                        <div class="data-label">Accel X (m/s²)</div>
+                        <div class="data-value" id="accel-x">0.00</div>
+                    </div>
+                    <div class="data-item">
+                        <div class="data-label">Accel Y (m/s²)</div>
+                        <div class="data-value" id="accel-y">0.00</div>
+                    </div>
+                    <div class="data-item">
+                        <div class="data-label">Accel Z (m/s²)</div>
+                        <div class="data-value" id="accel-z">0.00</div>
+                    </div>
+                    <div class="data-item">
+                        <div class="data-label">Gyro X (rad/s)</div>
+                        <div class="data-value" id="gyro-x">0.000</div>
+                    </div>
+                    <div class="data-item">
+                        <div class="data-label">Gyro Y (rad/s)</div>
+                        <div class="data-value" id="gyro-y">0.000</div>
+                    </div>
+                    <div class="data-item">
+                        <div class="data-label">Gyro Z (rad/s)</div>
+                        <div class="data-value" id="gyro-z">0.000</div>
+                    </div>
+                    <div class="data-item">
+                        <div class="data-label">Mag X (μT)</div>
+                        <div class="data-value" id="mag-x">0.0</div>
+                    </div>
+                    <div class="data-item">
+                        <div class="data-label">Mag Y (μT)</div>
+                        <div class="data-value" id="mag-y">0.0</div>
+                    </div>
+                    <div class="data-item">
+                        <div class="data-label">Mag Z (μT)</div>
+                        <div class="data-value" id="mag-z">0.0</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="panel" style="margin: 20px;">
+            <h2>🔗 Connection Status</h2>
+            <div class="status disconnected" id="status">Disconnected</div>
+        </div>
+        
+        <div class="panel" style="margin: 20px;">
+            <h2>🔍 Raw Data (Debug)</h2>
+            <div class="raw-data" id="raw-data">Waiting for data...</div>
+        </div>
+    </div>
+
+    <script>
+        let ws = null;
+        let lastData = null;
+        
+        function connect() {
+            const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+            const wsUrl = `${protocol}//${window.location.host}/ws`;
+            
+            ws = new WebSocket(wsUrl);
+            
+            ws.onopen = function() {
+                updateStatus('connected', 'Connected to IMU stream');
+            };
+            
+            ws.onmessage = function(event) {
+                try {
+                    const payload = JSON.parse(event.data);
+                    if (payload.type === 'imu_data') {
+                        lastData = payload.data;
+                        updateDisplay(payload.data);
+                    }
+                } catch (e) {
+                    console.error('Error parsing message:', e);
+                }
+            };
+            
+            ws.onclose = function() {
+                updateStatus('disconnected', 'Disconnected from server');
+                // Reconnect after 2 seconds
+                setTimeout(connect, 2000);
+            };
+            
+            ws.onerror = function(error) {
+                console.error('WebSocket error:', error);
+                updateStatus('disconnected', 'Connection error');
+            };
+        }
+        
+        function updateStatus(type, message) {
+            const statusEl = document.getElementById('status');
+            statusEl.className = `status ${type}`;
+            statusEl.textContent = message;
+        }
+        
+        function updateDisplay(data) {
+            if (!data) return;
+            
+            // Update heading
+            const headingRad = data.heading_rad || 0;
+            const headingDeg = data.heading_deg || 0;
+            
+            document.getElementById('heading-rad').textContent = headingRad.toFixed(3);
+            document.getElementById('heading-deg').textContent = `${headingDeg.toFixed(1)}°`;
+            
+            // Update compass needle (rotate to show heading)
+            // For counter-clockwise system, we need to negate the rotation
+            const needle = document.getElementById('needle');
+            needle.style.transform = `translate(-50%, -100%) rotate(${-headingDeg}deg)`;
+            
+            // Update sensor data
+            if (data.accel) {
+                document.getElementById('accel-x').textContent = data.accel.x.toFixed(2);
+                document.getElementById('accel-y').textContent = data.accel.y.toFixed(2);
+                document.getElementById('accel-z').textContent = data.accel.z.toFixed(2);
+            }
+            
+            if (data.gyro) {
+                document.getElementById('gyro-x').textContent = data.gyro.x.toFixed(3);
+                document.getElementById('gyro-y').textContent = data.gyro.y.toFixed(3);
+                document.getElementById('gyro-z').textContent = data.gyro.z.toFixed(3);
+            }
+            
+            if (data.mag) {
+                document.getElementById('mag-x').textContent = data.mag.x.toFixed(1);
+                document.getElementById('mag-y').textContent = data.mag.y.toFixed(1);
+                document.getElementById('mag-z').textContent = data.mag.z.toFixed(1);
+            }
+            
+            // Update status based on data
+            if (data.mock) {
+                updateStatus('mock', 'Running in mock mode (no hardware)');
+            } else if (data.error) {
+                updateStatus('disconnected', `Error: ${data.error}`);
+            } else {
+                updateStatus('connected', 'Connected to real IMU hardware');
+            }
+            
+            // Update raw data display
+            document.getElementById('raw-data').textContent = JSON.stringify(data, null, 2);
+        }
+        
+        // Connect when page loads
+        window.addEventListener('load', connect);
+    </script>
+</body>
+</html>

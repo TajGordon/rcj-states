@@ -33,9 +33,9 @@ class IMU:
         
         Returns heading where:
         - 0 radians = North
-        - -π/2 radians = West (90° counter-clockwise from north)
-        - -π radians = South (180° counter-clockwise from north)
-        - -3π/2 radians = East (270° counter-clockwise from north)
+        - π/2 radians = East (90° clockwise from north)
+        - π radians = South (180° clockwise from north)
+        - 3π/2 radians = West (270° clockwise from north)
         """
         qi, qj, qk, qr = self.bno.quaternion
         # yaw from quaternion (same as soccer_robot.py)
@@ -43,9 +43,9 @@ class IMU:
         
         # Convert from BNO085 coordinate system to your system:
         # BNO085: 0 = +X (east), π/2 = +Y (north), counter-clockwise positive
-        # Your system: 0 = north, counter-clockwise positive
-        # So we need to rotate by -π/2: yaw_bno - π/2 = yaw_yours
-        heading = yaw - math.pi / 2.0
+        # Your system: 0 = north, clockwise positive
+        # So we need to rotate by π/2: yaw_bno + π/2 = yaw_yours
+        heading = yaw + math.pi / 2.0
         
         # normalize to [0, 2π)
         return (heading + 2.0 * math.pi) % (2.0 * math.pi)
