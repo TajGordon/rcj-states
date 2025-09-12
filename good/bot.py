@@ -6,9 +6,7 @@ import signal
 import sys
 from imu import IMU
 from camera import Camera
-from tof_stuff import ToFArray
 from motor_controller import MotorController
-from localization import Localization
 from agents.blind_ball_chaser import Agent
 
 class Bot:
@@ -20,8 +18,7 @@ class Bot:
         self.motor_controller = MotorController(i2c=self.i2c)
         self.camera = Camera(enable_frame_queue=True, detection_mode='enhanced')
         self.imu = IMU(i2c=self.i2c)
-        self.tof = ToFArray(self.i2c)
-        self.localization = Localization()
+        # Note: ToF and Localization not needed for simple ball following
         self.agent = Agent(bot=self)
         
         # Verify motor controller is ready

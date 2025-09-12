@@ -1,4 +1,3 @@
-import config
 import math
 import time
 
@@ -22,9 +21,6 @@ class Agent:
         # Distance thresholds (in pixels)
         self.close_distance = 80   # Close to ball
         self.far_distance = 200    # Far from ball
-        
-        # Boundary safety margins (in mm)
-        self.boundary_margin = 100  # Stay 100mm away from field boundaries
         
         # Movement state management
         self.last_ball_angle = 0.0
@@ -76,11 +72,8 @@ class Agent:
             self.stop()
     
     def _chase_ball_cycle(self):
-        """Single cycle of ball chasing logic with movement state management."""
+        """Single cycle of ball chasing logic - simplified to focus only on ball angle."""
         try:
-            # Get current robot position and heading
-            robot_x, robot_y, robot_heading = self._get_robot_state()
-            
             # Get ball information
             ball_detected = self.bot.camera.is_ball_detected()
             
@@ -94,12 +87,8 @@ class Agent:
                 
                 # Check if movement is needed (avoid micro-adjustments)
                 if self._should_move(ball_angle, ball_distance):
-                    # Check if we're too close to boundaries
-                    if self._is_near_boundary(robot_x, robot_y):
-                        self._avoid_boundary(robot_x, robot_y, robot_heading)
-                    else:
-                        # Chase the ball
-                        self._chase_ball(ball_angle, ball_distance)
+                    # Simply chase the ball - no boundary checking for now
+                    self._chase_ball(ball_angle, ball_distance)
                 
                 # Store for reference
                 self.last_ball_angle = ball_angle
@@ -184,53 +173,20 @@ class Agent:
                 print("Too many motor errors, stopping")
                 self.running = False
     
-    def _get_robot_state(self):
-        """Get current robot position and heading."""
+    def _get_robot_heading(self):
+        """Get current robot heading from IMU."""
         try:
             # Get IMU heading
             robot_heading = self.bot.imu.get_heading_rad()
-            
-            # Get ToF data for localization
-            tof_pairs = self.bot.tof.get_localization_pairs(fresh=False)
-            
-            # Get position estimate
-            robot_x, robot_y, _ = self.bot.localization.estimate_position(robot_heading, tof_pairs)
-            
-            return robot_x, robot_y, robot_heading
+            return robot_heading
         except Exception as e:
-            print(f"Error getting robot state: {e}")
-            # Fallback if localization fails
-            return config.field_center_x, config.field_center_y, 0.0
+            print(f"Error getting robot heading: {e}")
+            # Fallback if IMU fails
+            return 0.0
     
-    def _is_near_boundary(self, x, y):
-        """Check if robot is too close to field boundaries."""
-        return (x < config.field_boundary_left + self.boundary_margin or
-                x > config.field_boundary_right - self.boundary_margin or
-                y < config.field_boundary_top + self.boundary_margin or
-                y > config.field_boundary_bottom - self.boundary_margin)
-    
-    def _avoid_boundary(self, x, y, heading):
-        """Move away from boundaries."""
-        print(f"Near boundary at ({x:.0f}, {y:.0f}) - avoiding")
-        
-        # Calculate direction away from nearest boundary
-        if x < config.field_boundary_left + self.boundary_margin:
-            # Too close to left boundary - move right
-            direction = 90  # degrees
-        elif x > config.field_boundary_right - self.boundary_margin:
-            # Too close to right boundary - move left
-            direction = 270  # degrees
-        elif y < config.field_boundary_top + self.boundary_margin:
-            # Too close to top boundary - move down
-            direction = 180  # degrees
-        else:  # y > config.field_boundary_bottom - self.boundary_margin
-            # Too close to bottom boundary - move up
-            direction = 0  # degrees
-        
-        self._safe_motor_command('move_direction', direction, self.slow_speed_level)
     
     def _chase_ball(self, ball_angle, ball_distance):
-        """Chase the ball based on angle and distance."""
+        """Chase the ball based on angle and distance - simplified approach."""
         # Convert ball angle to movement direction
         # Ball angle is in radians, 0 = forward, clockwise
         # Move direction is in degrees, 0 = forward, clockwise
