@@ -37,6 +37,7 @@ class SoccerRobot:
         self.turn_threshold = 0.1  # Minimum error to start turning (reduces jitter)
         self.tight_turn_factor = 0.3  # Reduce forward speed during turns for tighter turning
         self.pure_turn_threshold = 0.4  # Error threshold for pure turning in place (no forward movement)
+        self.nonlinear_turn_power = 0.5  # Power for nonlinear turning (0.5 = square root, 1.0 = linear)
         
         self.i2c = busio.I2C(board.SCL, board.SDA)
         self.motors = []
@@ -247,7 +248,18 @@ class SoccerRobot:
         else:
             # Positive error_x_norm means ball is to the right, so turn right
             # Negative error_x_norm means ball is to the left, so turn left
-            turn_adjustment = error_x_norm * self.max_speed * self.kp_turn
+            
+            # Use nonlinear turning response to reduce over-turning when ball is close to center
+            # Apply a square root function to reduce sensitivity for small errors
+            error_sign = 1 if error_x_norm > 0 else -1
+            error_magnitude = abs(error_x_norm)
+            
+            # Nonlinear scaling: error^power for gentler response near center
+            # This reduces over-turning when ball is close to center
+            # 0.5 = square root (gentle), 1.0 = linear (aggressive)
+            nonlinear_error = error_sign * (error_magnitude ** self.nonlinear_turn_power)
+            
+            turn_adjustment = nonlinear_error * self.max_speed * self.kp_turn
             is_turning = True
 
         # Base forward movement speed (based on max_speed)
@@ -320,7 +332,11 @@ class SoccerRobot:
                         is_turning = False
                         turn_mode = "STRAIGHT"
                     else:
-                        turn_adjustment = error_x_norm * self.max_speed * self.kp_turn
+                        # Use same nonlinear calculation as in motor commands
+                        error_sign = 1 if error_x_norm > 0 else -1
+                        error_magnitude = abs(error_x_norm)
+                        nonlinear_error = error_sign * (error_magnitude ** self.nonlinear_turn_power)
+                        turn_adjustment = nonlinear_error * self.max_speed * self.kp_turn
                         is_turning = True
                         if abs(error_x_norm) > self.pure_turn_threshold:
                             turn_mode = "PURE_TURN"
