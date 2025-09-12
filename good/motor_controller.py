@@ -231,10 +231,10 @@ class MotorController:
         
         if direction.lower() == 'left':
             # Turn left: left motors backward, right motors forward
-            speeds = [base_speed, -base_speed, base_speed, -base_speed]
+            speeds = [int(base_speed), int(-base_speed), int(base_speed), int(-base_speed)]
         elif direction.lower() == 'right':
             # Turn right: left motors forward, right motors backward
-            speeds = [-base_speed, base_speed, -base_speed, base_speed]
+            speeds = [int(-base_speed), int(base_speed), int(-base_speed), int(base_speed)]
         else:
             print(f"Invalid turn direction '{direction}'. Use 'left' or 'right'.")
             return
