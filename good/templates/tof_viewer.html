@@ -361,8 +361,10 @@
                 const d = r.distance_mm * pxPerMm;
                 const ang = r.angle_rad; // already radians, counter-clockwise from north per config
                 
-                // Convert to canvas coordinates: x = sin(theta), y = -cos(theta)
-                const dx = Math.sin(ang) * d;
+                // Convert to canvas coordinates: counter-clockwise from north
+                // For counter-clockwise from north: x = -sin(theta), y = -cos(theta)
+                // Negative x because canvas coordinates are mirrored from standard math coordinates
+                const dx = -Math.sin(ang) * d;
                 const dy = -Math.cos(ang) * d;
                 const x2 = originX + dx;
                 const y2 = originY + dy;
