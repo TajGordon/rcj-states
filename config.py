@@ -14,7 +14,7 @@ if hostname == 'storm':
     """ tof stuff """
     tof_count = 8
     tof_addresses = [80, 88, 94, 91, 95, 93, 92, 90]
-    tof_enabled = {80: True, 88: True, 94: True, 91: True, 95: False, 93: True, 92: True, 86: True} # my back one is covered so disable it
+    tof_enabled = {80: True, 88: True, 94: True, 91: True, 95: False, 93: True, 92: True, 90: True} # my back one is covered so disable it
     tof_angles = { # address -> radians, radians from north, starting at 0 and going clockwise
         80: 0, 
         88: math.radians(35), 
@@ -23,7 +23,7 @@ if hostname == 'storm':
         95: math.radians(180), 
         93: math.radians(215), 
         92: math.radians(270), 
-        86: math.radians(305)
+        90: math.radians(305)
     } 
     tof_offsets = { # address -> offset, in mm, like how far the tof is from the center of the robot
         80: 42.5,
@@ -33,7 +33,7 @@ if hostname == 'storm':
         95: 42.5,
         93: 111.5,
         92: 57,
-        86: 111.5
+        90: 111.5
     }
 
 else: # assuming siddak bot rn
