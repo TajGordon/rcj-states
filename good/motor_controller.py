@@ -11,7 +11,7 @@ import config
 class MotorController:
     def __init__(self, force_calibration=False):
         # Motor configuration
-        self.max_speed = 10_000_000  # Maximum speed for all movements
+        self.max_speed = 50_000_000  # Maximum speed for all movements
         self.max_current = 4 * 65536  # 4A current limit (4 * 65536 for the driver)
         
         # Speed levels (1-8) with corresponding multipliers
