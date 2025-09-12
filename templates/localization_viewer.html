@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Localization Debug</title>
+    <style>
+        body { margin: 0; background: #0f1115; color: #e5e7eb; font-family: Arial, Helvetica, sans-serif; }
+        header { padding: 12px 16px; border-bottom: 1px solid #1f2430; display: flex; justify-content: space-between; align-items: center; }
+        .pill { font-size: 12px; padding: 4px 8px; border-radius: 999px; background: #111827; border: 1px solid #293241; }
+        #status { color: #10b981; }
+        main { display: grid; grid-template-columns: 1fr 320px; gap: 16px; padding: 16px; }
+        canvas { width: 100%; height: auto; border: 1px solid #1f2430; background: #0b0d12; border-radius: 8px; }
+        .panel { background: #0b0d12; border: 1px solid #1f2430; border-radius: 8px; padding: 12px; }
+        .row { display: flex; justify-content: space-between; margin: 6px 0; font-size: 12px; }
+        .row span:first-child { color: #93c5fd; }
+        .muted { color: #9ca3af; }
+    </style>
+</head>
+<body>
+    <header>
+        <div>Localization Debug Viewer</div>
+        <div class="pill">Status: <span id="status">Connecting…</span></div>
+    </header>
+    <main>
+        <section>
+            <canvas id="view" width="2500" height="1900"></canvas>
+        </section>
+        <aside class="panel">
+            <div class="row"><span>WebSocket</span><span id="wsState" class="muted">—</span></div>
+            <div class="row"><span>Rays</span><span id="rayCount">0</span></div>
+            <div class="row"><span>FPS</span><span id="fps">0</span></div>
+        </aside>
+    </main>
+
+    <script>
+        const canvas = document.getElementById('view');
+        const ctx = canvas.getContext('2d');
+        const statusEl = document.getElementById('status');
+        const wsStateEl = document.getElementById('wsState');
+        const rayCountEl = document.getElementById('rayCount');
+        const fpsEl = document.getElementById('fps');
+
+        let lastFpsUpdate = performance.now();
+        let frames = 0;
+
+        function drawField(segments) {
+            ctx.strokeStyle = '#1f2937';
+            ctx.lineWidth = 2;
+            segments.forEach(s => {
+                ctx.beginPath();
+                ctx.moveTo(s.x1, s.y1);
+                ctx.lineTo(s.x2, s.y2);
+                ctx.stroke();
+            });
+        }
+
+        function drawBot(pose) {
+            const r = 110; // visualize ~robot radius
+            ctx.fillStyle = '#3b82f6';
+            ctx.beginPath();
+            ctx.arc(pose.x_mm, pose.y_mm, r, 0, Math.PI * 2);
+            ctx.fill();
+            // heading line
+            ctx.strokeStyle = '#f59e0b';
+            ctx.lineWidth = 6;
+            const hx = pose.x_mm + Math.cos(pose.theta_rad) * 200;
+            const hy = pose.y_mm + Math.sin(pose.theta_rad) * 200;
+            ctx.beginPath();
+            ctx.moveTo(pose.x_mm, pose.y_mm);
+            ctx.lineTo(hx, hy);
+            ctx.stroke();
+        }
+
+        function drawRays(pose, rays) {
+            ctx.strokeStyle = '#a7f3d0';
+            ctx.lineWidth = 2;
+            rays.forEach(r => {
+                const ang = pose.theta_rad + r.angle_rad;
+                const x2 = pose.x_mm + Math.cos(ang) * r.distance_mm;
+                const y2 = pose.y_mm + Math.sin(ang) * r.distance_mm;
+                ctx.beginPath();
+                ctx.moveTo(pose.x_mm, pose.y_mm);
+                ctx.lineTo(x2, y2);
+                ctx.stroke();
+            });
+        }
+
+        function draw(data) {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            drawField(data.field || []);
+            drawBot(data.pose);
+            drawRays(data.pose, data.rays || []);
+
+            rayCountEl.textContent = (data.rays || []).length;
+
+            // FPS calc
+            const now = performance.now();
+            frames++;
+            if (now - lastFpsUpdate >= 500) {
+                const fps = frames * 1000 / (now - lastFpsUpdate);
+                fpsEl.textContent = fps.toFixed(1);
+                frames = 0;
+                lastFpsUpdate = now;
+            }
+        }
+
+        function connect() {
+            const protocol = location.protocol === 'https:' ? 'wss' : 'ws';
+            const wsUrl = `${protocol}://${location.host}/ws`;
+            const ws = new WebSocket(wsUrl);
+
+            ws.addEventListener('open', () => {
+                statusEl.textContent = 'Connected';
+                statusEl.style.color = '#10b981';
+                wsStateEl.textContent = 'open';
+            });
+
+            ws.addEventListener('close', () => {
+                statusEl.textContent = 'Disconnected';
+                statusEl.style.color = '#ef4444';
+                wsStateEl.textContent = 'closed — retrying…';
+                setTimeout(connect, 1000);
+            });
+
+            ws.addEventListener('error', () => {
+                wsStateEl.textContent = 'error';
+            });
+
+            ws.addEventListener('message', (ev) => {
+                try {
+                    const msg = JSON.parse(ev.data);
+                    if (msg.type === 'localization') {
+                        draw(msg.data);
+                    }
+                } catch {}
+            });
+        }
+
+        connect();
+    </script>
+</body>
+</html>
+
+
