@@ -1,0 +1,498 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Robot Remote Control</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #1a1a1a;
+            color: white;
+        }
+        
+        .container {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            grid-template-rows: auto auto 1fr;
+            gap: 20px;
+            height: 100vh;
+        }
+        
+        .header {
+            grid-column: 1 / -1;
+            text-align: center;
+            background: linear-gradient(45deg, #2c3e50, #3498db);
+            padding: 20px;
+            border-radius: 10px;
+        }
+        
+        .video-section {
+            background: #2c2c2c;
+            border-radius: 10px;
+            padding: 20px;
+            text-align: center;
+        }
+        
+        .control-section {
+            background: #2c2c2c;
+            border-radius: 10px;
+            padding: 20px;
+        }
+        
+        .data-section {
+            grid-column: 1 / -1;
+            background: #2c2c2c;
+            border-radius: 10px;
+            padding: 20px;
+        }
+        
+        .video-feed {
+            max-width: 100%;
+            max-height: 400px;
+            border: 2px solid #3498db;
+            border-radius: 10px;
+        }
+        
+        .controls {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 10px;
+            margin: 20px 0;
+        }
+        
+        .control-btn {
+            padding: 20px;
+            font-size: 18px;
+            font-weight: bold;
+            border: none;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: all 0.2s;
+            background: #34495e;
+            color: white;
+        }
+        
+        .control-btn:hover {
+            background: #3498db;
+            transform: scale(1.05);
+        }
+        
+        .control-btn:active {
+            background: #2980b9;
+            transform: scale(0.95);
+        }
+        
+        .control-btn.active {
+            background: #e74c3c;
+            box-shadow: 0 0 20px rgba(231, 76, 60, 0.5);
+        }
+        
+        .speed-control {
+            margin: 20px 0;
+            text-align: center;
+        }
+        
+        .speed-slider {
+            width: 100%;
+            margin: 10px 0;
+        }
+        
+        .data-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-top: 20px;
+        }
+        
+        .data-card {
+            background: #34495e;
+            padding: 15px;
+            border-radius: 8px;
+            border-left: 4px solid #3498db;
+        }
+        
+        .data-card h3 {
+            margin: 0 0 10px 0;
+            color: #3498db;
+        }
+        
+        .data-value {
+            font-size: 18px;
+            font-weight: bold;
+        }
+        
+        .field-visualization {
+            width: 100%;
+            height: 300px;
+            border: 2px solid #3498db;
+            border-radius: 10px;
+            background: #27ae60;
+            position: relative;
+            margin: 20px 0;
+        }
+        
+        .robot-marker {
+            position: absolute;
+            width: 20px;
+            height: 20px;
+            background: #e74c3c;
+            border: 2px solid white;
+            border-radius: 50%;
+            transform: translate(-50%, -50%);
+        }
+        
+        .ball-marker {
+            position: absolute;
+            width: 10px;
+            height: 10px;
+            background: #f39c12;
+            border: 1px solid white;
+            border-radius: 50%;
+            transform: translate(-50%, -50%);
+        }
+        
+        .tof-ray {
+            position: absolute;
+            height: 2px;
+            background: rgba(52, 152, 219, 0.6);
+            transform-origin: left center;
+        }
+        
+        .status {
+            padding: 10px;
+            border-radius: 5px;
+            margin: 10px 0;
+            text-align: center;
+        }
+        
+        .status.connected {
+            background: #27ae60;
+        }
+        
+        .status.disconnected {
+            background: #e74c3c;
+        }
+        
+        .instructions {
+            background: #34495e;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 20px 0;
+        }
+        
+        .instructions h3 {
+            color: #3498db;
+            margin-top: 0;
+        }
+        
+        .instructions ul {
+            margin: 10px 0;
+            padding-left: 20px;
+        }
+        
+        .instructions li {
+            margin: 5px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🤖 Robot Remote Control</h1>
+            <p>Real-time control and monitoring of your robot</p>
+        </div>
+        
+        <div class="video-section">
+            <h2>📹 Camera Feed</h2>
+            <img src="/video_feed" class="video-feed" alt="Robot Camera Feed">
+            <div id="status" class="status disconnected">Disconnected</div>
+        </div>
+        
+        <div class="control-section">
+            <h2>🎮 Controls</h2>
+            
+            <div class="instructions">
+                <h3>Control Instructions:</h3>
+                <ul>
+                    <li><strong>WASD:</strong> Move robot (W=forward, S=backward, A=left, D=right)</li>
+                    <li><strong>Q/E:</strong> Rotate robot (Q=left, E=right)</li>
+                    <li><strong>Speed:</strong> Adjust movement speed (1-8)</li>
+                    <li><strong>Release keys:</strong> Stop movement</li>
+                </ul>
+            </div>
+            
+            <div class="controls">
+                <div></div>
+                <button class="control-btn" id="w-btn" data-key="w">W</button>
+                <div></div>
+                <button class="control-btn" id="a-btn" data-key="a">A</button>
+                <button class="control-btn" id="s-btn" data-key="s">S</button>
+                <button class="control-btn" id="d-btn" data-key="d">D</button>
+                <button class="control-btn" id="q-btn" data-key="q">Q</button>
+                <div></div>
+                <button class="control-btn" id="e-btn" data-key="e">E</button>
+            </div>
+            
+            <div class="speed-control">
+                <h3>Speed Level: <span id="speed-display">5</span></h3>
+                <input type="range" id="speed-slider" class="speed-slider" min="1" max="8" value="5">
+                <div style="display: flex; justify-content: space-between; font-size: 12px; color: #bdc3c7;">
+                    <span>Slow (1)</span>
+                    <span>Fast (8)</span>
+                </div>
+            </div>
+        </div>
+        
+        <div class="data-section">
+            <h2>📊 Robot Data</h2>
+            
+            <div class="field-visualization" id="field-viz">
+                <div class="robot-marker" id="robot-marker" style="left: 50%; top: 50%;"></div>
+                <div class="ball-marker" id="ball-marker" style="display: none;"></div>
+            </div>
+            
+            <div class="data-grid">
+                <div class="data-card">
+                    <h3>Position</h3>
+                    <div class="data-value" id="position">(0, 0)</div>
+                </div>
+                
+                <div class="data-card">
+                    <h3>Heading</h3>
+                    <div class="data-value" id="heading">0°</div>
+                </div>
+                
+                <div class="data-card">
+                    <h3>Ball Status</h3>
+                    <div class="data-value" id="ball-status">Not Detected</div>
+                </div>
+                
+                <div class="data-card">
+                    <h3>Ball Position</h3>
+                    <div class="data-value" id="ball-position">(0, 0)</div>
+                </div>
+                
+                <div class="data-card">
+                    <h3>Ball Distance</h3>
+                    <div class="data-value" id="ball-distance">0 px</div>
+                </div>
+                
+                <div class="data-card">
+                    <h3>Localization Error</h3>
+                    <div class="data-value" id="localization-error">0.0</div>
+                </div>
+                
+                <div class="data-card">
+                    <h3>ToF Sensors</h3>
+                    <div class="data-value" id="tof-count">0 active</div>
+                </div>
+                
+                <div class="data-card">
+                    <h3>Last Update</h3>
+                    <div class="data-value" id="last-update">Never</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Socket.IO connection
+        const socket = io();
+        
+        // DOM elements
+        const statusEl = document.getElementById('status');
+        const speedDisplay = document.getElementById('speed-display');
+        const speedSlider = document.getElementById('speed-slider');
+        const controlBtns = document.querySelectorAll('.control-btn');
+        
+        // Data display elements
+        const positionEl = document.getElementById('position');
+        const headingEl = document.getElementById('heading');
+        const ballStatusEl = document.getElementById('ball-status');
+        const ballPositionEl = document.getElementById('ball-position');
+        const ballDistanceEl = document.getElementById('ball-distance');
+        const localizationErrorEl = document.getElementById('localization-error');
+        const tofCountEl = document.getElementById('tof-count');
+        const lastUpdateEl = document.getElementById('last-update');
+        
+        // Field visualization elements
+        const fieldViz = document.getElementById('field-viz');
+        const robotMarker = document.getElementById('robot-marker');
+        const ballMarker = document.getElementById('ball-marker');
+        
+        // Field dimensions (from config)
+        const fieldWidth = 2430;  // mm
+        const fieldHeight = 1820; // mm
+        const fieldBoundaryLeft = 250;
+        const fieldBoundaryRight = fieldWidth - 250;
+        const fieldBoundaryTop = 250;
+        const fieldBoundaryBottom = fieldHeight - 250;
+        
+        // Control state
+        const activeKeys = new Set();
+        
+        // Socket event handlers
+        socket.on('connect', function() {
+            statusEl.textContent = 'Connected';
+            statusEl.className = 'status connected';
+        });
+        
+        socket.on('disconnect', function() {
+            statusEl.textContent = 'Disconnected';
+            statusEl.className = 'status disconnected';
+        });
+        
+        socket.on('robot_data', function(data) {
+            updateRobotData(data);
+        });
+        
+        // Update robot data display
+        function updateRobotData(data) {
+            // Position and heading
+            positionEl.textContent = `(${data.position[0].toFixed(0)}, ${data.position[1].toFixed(0)})`;
+            headingEl.textContent = `${data.heading.toFixed(1)}°`;
+            
+            // Ball data
+            if (data.ball_detected) {
+                ballStatusEl.textContent = 'Detected';
+                ballStatusEl.style.color = '#27ae60';
+                ballPositionEl.textContent = `(${data.ball_position[0]}, ${data.ball_position[1]})`;
+                ballDistanceEl.textContent = `${data.ball_distance.toFixed(0)} px`;
+            } else {
+                ballStatusEl.textContent = 'Not Detected';
+                ballStatusEl.style.color = '#e74c3c';
+                ballPositionEl.textContent = '(0, 0)';
+                ballDistanceEl.textContent = '0 px';
+            }
+            
+            // Other data
+            localizationErrorEl.textContent = data.localization_error.toFixed(2);
+            tofCountEl.textContent = `${data.tof_readings.length} active`;
+            lastUpdateEl.textContent = new Date(data.last_update * 1000).toLocaleTimeString();
+            
+            // Update field visualization
+            updateFieldVisualization(data);
+        }
+        
+        // Update field visualization
+        function updateFieldVisualization(data) {
+            const [robotX, robotY] = data.position;
+            
+            // Convert robot position to field visualization coordinates
+            const vizX = ((robotX - fieldBoundaryLeft) / (fieldBoundaryRight - fieldBoundaryLeft)) * 100;
+            const vizY = ((robotY - fieldBoundaryTop) / (fieldBoundaryBottom - fieldBoundaryTop)) * 100;
+            
+            // Clamp to field bounds
+            const clampedX = Math.max(0, Math.min(100, vizX));
+            const clampedY = Math.max(0, Math.min(100, vizY));
+            
+            // Update robot marker position
+            robotMarker.style.left = `${clampedX}%`;
+            robotMarker.style.top = `${clampedY}%`;
+            
+            // Update robot marker rotation
+            robotMarker.style.transform = `translate(-50%, -50%) rotate(${data.heading}deg)`;
+            
+            // Update ball marker if ball is detected
+            if (data.ball_detected) {
+                // For ball position, we'll use a simple approximation
+                // In reality, you'd need to convert camera coordinates to field coordinates
+                ballMarker.style.display = 'block';
+                ballMarker.style.left = `${50 + (data.ball_angle / 180) * 20}%`;
+                ballMarker.style.top = `${50 - (data.ball_distance / 200) * 20}%`;
+            } else {
+                ballMarker.style.display = 'none';
+            }
+            
+            // Clear existing ToF rays
+            const existingRays = fieldViz.querySelectorAll('.tof-ray');
+            existingRays.forEach(ray => ray.remove());
+            
+            // Add ToF rays
+            data.tof_readings.forEach(reading => {
+                const ray = document.createElement('div');
+                ray.className = 'tof-ray';
+                ray.style.left = `${clampedX}%`;
+                ray.style.top = `${clampedY}%`;
+                ray.style.width = `${Math.min(reading.distance / 10, 50)}px`;
+                ray.style.transform = `rotate(${reading.angle}deg)`;
+                fieldViz.appendChild(ray);
+            });
+        }
+        
+        // Speed control
+        speedSlider.addEventListener('input', function() {
+            const speed = parseInt(this.value);
+            speedDisplay.textContent = speed;
+            socket.emit('speed_change', { speed: speed });
+        });
+        
+        // Control button handlers
+        controlBtns.forEach(btn => {
+            btn.addEventListener('mousedown', function() {
+                const key = this.dataset.key;
+                activeKeys.add(key);
+                this.classList.add('active');
+                socket.emit('control_input', { key: key, action: 'press' });
+            });
+            
+            btn.addEventListener('mouseup', function() {
+                const key = this.dataset.key;
+                activeKeys.delete(key);
+                this.classList.remove('active');
+                socket.emit('control_input', { key: key, action: 'release' });
+            });
+            
+            btn.addEventListener('mouseleave', function() {
+                const key = this.dataset.key;
+                activeKeys.delete(key);
+                this.classList.remove('active');
+                socket.emit('control_input', { key: key, action: 'release' });
+            });
+        });
+        
+        // Keyboard event handlers
+        document.addEventListener('keydown', function(event) {
+            const key = event.key.toLowerCase();
+            if (['w', 'a', 's', 'd', 'q', 'e'].includes(key) && !activeKeys.has(key)) {
+                activeKeys.add(key);
+                const btn = document.getElementById(`${key}-btn`);
+                if (btn) {
+                    btn.classList.add('active');
+                }
+                socket.emit('control_input', { key: key, action: 'press' });
+                event.preventDefault();
+            }
+        });
+        
+        document.addEventListener('keyup', function(event) {
+            const key = event.key.toLowerCase();
+            if (['w', 'a', 's', 'd', 'q', 'e'].includes(key)) {
+                activeKeys.delete(key);
+                const btn = document.getElementById(`${key}-btn`);
+                if (btn) {
+                    btn.classList.remove('active');
+                }
+                socket.emit('control_input', { key: key, action: 'release' });
+                event.preventDefault();
+            }
+        });
+        
+        // Prevent default behavior for control keys
+        document.addEventListener('keydown', function(event) {
+            if (['w', 'a', 's', 'd', 'q', 'e'].includes(event.key.toLowerCase())) {
+                event.preventDefault();
+            }
+        });
+        
+        // Focus handling to ensure keyboard events work
+        window.addEventListener('click', function() {
+            window.focus();
+        });
+    </script>
+</body>
+</html>
