@@ -29,14 +29,26 @@ class IMU:
         print("BNO085 IMU initialized successfully")
 
     def get_heading_rad(self):
-        """Get heading in radians [0, 2π) from quaternion."""
+        """Get heading in radians [0, 2π) from quaternion.
+        
+        Returns heading where:
+        - 0 radians = North
+        - -π/2 radians = West (90° counter-clockwise from north)
+        - -π radians = South (180° counter-clockwise from north)
+        - -3π/2 radians = East (270° counter-clockwise from north)
+        """
         qi, qj, qk, qr = self.bno.quaternion
         # yaw from quaternion (same as soccer_robot.py)
         yaw = math.atan2(2.0 * (qr * qk + qi * qj), 1.0 - 2.0 * (qj * qj + qk * qk))
+        
+        # Convert from BNO085 coordinate system to your system:
+        # BNO085: 0 = +X (east), π/2 = +Y (north), counter-clockwise positive
+        # Your system: 0 = north, counter-clockwise positive
+        # So we need to rotate by -π/2: yaw_bno - π/2 = yaw_yours
+        heading = yaw - math.pi / 2.0
+        
         # normalize to [0, 2π)
-        if yaw < 0:
-            yaw += 2.0 * math.pi
-        return yaw
+        return (heading + 2.0 * math.pi) % (2.0 * math.pi)
 
     def get_heading_deg(self):
         """Get heading in degrees [0, 360) from quaternion."""
