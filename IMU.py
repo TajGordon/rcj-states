@@ -15,25 +15,60 @@ from adafruit_bno08x.i2c import BNO08X_I2C
 
 class IMU:
     def __init__(self, i2c=None):
-        self.i2c = i2c or busio.I2C(board.SCL, board.SDA)
         self._lock = threading.Lock()
         self._running = False
         self._thread = None
         self.bno = None
+        self.i2c = None
 
-        # Initialize BNO085 with timeout
+        # Initialize BNO085 with timeout and better I2C handling
         try:
             print("Initializing BNO085 IMU...")
-            self.bno = BNO08X_I2C(self.i2c)
-            self.bno.enable_feature(BNO_REPORT_ACCELEROMETER)
-            self.bno.enable_feature(BNO_REPORT_GYROSCOPE)
-            self.bno.enable_feature(BNO_REPORT_MAGNETOMETER)
-            self.bno.enable_feature(BNO_REPORT_ROTATION_VECTOR)
-            print("BNO085 IMU initialized successfully")
+            
+            # Create new I2C instance if not provided
+            if i2c is None:
+                self.i2c = busio.I2C(board.SCL, board.SDA)
+                # Try to lock with timeout
+                import time
+                start_time = time.time()
+                while not self.i2c.try_lock():
+                    if time.time() - start_time > 2.0:  # 2 second timeout
+                        raise TimeoutError("I2C bus locked by another process")
+                    time.sleep(0.01)
+                print("I2C bus locked successfully")
+            else:
+                self.i2c = i2c
+            
+            # Try to initialize BNO085 with timeout
+            import signal
+            
+            def timeout_handler(signum, frame):
+                raise TimeoutError("BNO085 initialization timeout")
+            
+            signal.signal(signal.SIGALRM, timeout_handler)
+            signal.alarm(3)  # 3 second timeout
+            
+            try:
+                self.bno = BNO08X_I2C(self.i2c)
+                self.bno.enable_feature(BNO_REPORT_ACCELEROMETER)
+                self.bno.enable_feature(BNO_REPORT_GYROSCOPE)
+                self.bno.enable_feature(BNO_REPORT_MAGNETOMETER)
+                self.bno.enable_feature(BNO_REPORT_ROTATION_VECTOR)
+                signal.alarm(0)  # Cancel timeout
+                print("BNO085 IMU initialized successfully")
+            except TimeoutError:
+                signal.alarm(0)
+                raise TimeoutError("BNO085 not responding - check connections")
+                
         except Exception as e:
             print(f"BNO085 IMU initialization failed: {e}")
             print("IMU will return mock data")
             self.bno = None
+            if self.i2c and i2c is None:  # Only unlock if we created the I2C
+                try:
+                    self.i2c.unlock()
+                except:
+                    pass
 
         # Heading state
         self._heading_deg = 0.0
