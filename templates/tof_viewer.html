@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>ToF Viewer</title>
+    <style>
+        body { margin: 0; background: #0f1115; color: #e5e7eb; font-family: Arial, Helvetica, sans-serif; }
+        header { padding: 12px 16px; border-bottom: 1px solid #1f2430; display: flex; justify-content: space-between; align-items: center; }
+        .pill { font-size: 12px; padding: 4px 8px; border-radius: 999px; background: #111827; border: 1px solid #293241; }
+        #status { color: #10b981; }
+        main { display: grid; grid-template-columns: 1fr 320px; gap: 16px; padding: 16px; }
+        canvas { width: 100%; height: auto; border: 1px solid #1f2430; background: #0b0d12; border-radius: 8px; }
+        .panel { background: #0b0d12; border: 1px solid #1f2430; border-radius: 8px; padding: 12px; }
+        .row { display: flex; justify-content: space-between; margin: 6px 0; font-size: 12px; }
+        .row span:first-child { color: #93c5fd; }
+        .muted { color: #9ca3af; }
+    </style>
+</head>
+<body>
+    <header>
+        <div>ToF Live Viewer</div>
+        <div class="pill">Status: <span id="status">Connecting…</span></div>
+    </header>
+    <main>
+        <section>
+            <canvas id="view" width="640" height="640"></canvas>
+        </section>
+        <aside class="panel">
+            <div class="row"><span>WebSocket</span><span id="wsState" class="muted">—</span></div>
+            <div class="row"><span>Sensors</span><span id="sensorCount">0</span></div>
+            <div class="row"><span>FPS</span><span id="fps">0</span></div>
+        </aside>
+    </main>
+
+    <script>
+        const canvas = document.getElementById('view');
+        const ctx = canvas.getContext('2d');
+        const statusEl = document.getElementById('status');
+        const wsStateEl = document.getElementById('wsState');
+        const sensorCountEl = document.getElementById('sensorCount');
+        const fpsEl = document.getElementById('fps');
+
+        const originX = canvas.width / 2;
+        const originY = canvas.height / 2;
+        const pxPerMm = 0.25; // scale factor
+
+        let lastFrame = performance.now();
+        let frameCounter = 0;
+        let lastFpsUpdate = performance.now();
+
+        function draw(readings) {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            // draw origin
+            ctx.fillStyle = '#93c5fd';
+            ctx.beginPath();
+            ctx.arc(originX, originY, 3, 0, Math.PI * 2);
+            ctx.fill();
+
+            // draw circle rings (every 250mm)
+            ctx.strokeStyle = '#1f2937';
+            ctx.lineWidth = 1;
+            for (let r = 250; r <= 1500; r += 250) {
+                ctx.beginPath();
+                ctx.arc(originX, originY, r * pxPerMm, 0, Math.PI * 2);
+                ctx.stroke();
+            }
+
+            // draw ToF rays
+            ctx.lineWidth = 3;
+            readings.forEach(r => {
+                if (r.distance_mm <= 0 || r.angle_rad === null || r.angle_rad === undefined) return;
+                const d = r.distance_mm * pxPerMm;
+                const ang = r.angle_rad; // already radians, clockwise from north per config
+
+                // Convert to canvas coordinates: x = sin(theta), y = -cos(theta)
+                const dx = Math.sin(ang) * d;
+                const dy = -Math.cos(ang) * d;
+                const x2 = originX + dx;
+                const y2 = originY + dy;
+
+                ctx.strokeStyle = '#10b981';
+                ctx.beginPath();
+                ctx.moveTo(originX, originY);
+                ctx.lineTo(x2, y2);
+                ctx.stroke();
+
+                // endpoint dot
+                ctx.fillStyle = '#34d399';
+                ctx.beginPath();
+                ctx.arc(x2, y2, 4, 0, Math.PI * 2);
+                ctx.fill();
+            });
+        }
+
+        function connect() {
+            const protocol = location.protocol === 'https:' ? 'wss' : 'ws';
+            const wsUrl = `${protocol}://${location.host}/ws`;
+            const ws = new WebSocket(wsUrl);
+
+            ws.addEventListener('open', () => {
+                statusEl.textContent = 'Connected';
+                statusEl.style.color = '#10b981';
+                wsStateEl.textContent = 'open';
+            });
+
+            ws.addEventListener('close', () => {
+                statusEl.textContent = 'Disconnected';
+                statusEl.style.color = '#ef4444';
+                wsStateEl.textContent = 'closed — retrying…';
+                setTimeout(connect, 1000);
+            });
+
+            ws.addEventListener('error', () => {
+                wsStateEl.textContent = 'error';
+            });
+
+            ws.addEventListener('message', (ev) => {
+                try {
+                    const msg = JSON.parse(ev.data);
+                    if (msg.type === 'tof_readings') {
+                        const readings = msg.data || [];
+                        sensorCountEl.textContent = readings.length;
+                        draw(readings);
+
+                        // FPS calc
+                        const now = performance.now();
+                        frameCounter++;
+                        if (now - lastFpsUpdate >= 500) {
+                            const fps = frameCounter * 1000 / (now - lastFpsUpdate);
+                            fpsEl.textContent = fps.toFixed(1);
+                            frameCounter = 0;
+                            lastFpsUpdate = now;
+                        }
+                    }
+                } catch (e) {
+                    // ignore
+                }
+            });
+        }
+
+        connect();
+    </script>
+</body>
+</html>
+
+
