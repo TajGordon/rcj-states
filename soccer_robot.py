@@ -7,6 +7,13 @@ from steelbar_powerful_bldc_driver import PowerfulBLDCDriver
 import board
 import busio
 from picamera2 import Picamera2
+from adafruit_bno08x import (
+    BNO_REPORT_ACCELEROMETER,
+    BNO_REPORT_GYROSCOPE,
+    BNO_REPORT_MAGNETOMETER,
+    BNO_REPORT_ROTATION_VECTOR,
+)
+from adafruit_bno08x.i2c import BNO08X_I2C
 
 class SoccerRobot:
     def __init__(self):
@@ -35,6 +42,9 @@ class SoccerRobot:
         self.motors = []
         self.motor_modes = []
         self.setup_motors()
+        
+        # Initialize BNO085 IMU for compass
+        self.setup_imu()
         
         self.frame_center_x = 320
         self.frame_center_y = 240
@@ -91,6 +101,94 @@ class SoccerRobot:
             self.motor_modes.append(12)
             
         print(f"initialized {len(self.motors)} motors")
+    
+    def setup_imu(self):
+        """Initialize the BNO085 IMU sensor for compass functionality"""
+        try:
+            # Initialize BNO085 using the standard I2C approach
+            self.bno = BNO08X_I2C(self.i2c)
+            
+            # Enable the reports we need
+            self.bno.enable_feature(BNO_REPORT_ACCELEROMETER)
+            self.bno.enable_feature(BNO_REPORT_GYROSCOPE)
+            self.bno.enable_feature(BNO_REPORT_MAGNETOMETER)
+            self.bno.enable_feature(BNO_REPORT_ROTATION_VECTOR)
+            
+            # Initialize compass heading
+            self.initial_heading = None
+            self.current_heading = 0.0
+            
+            print("BNO085 IMU initialized successfully")
+            
+        except Exception as e:
+            print(f"Failed to initialize BNO085 IMU: {e}")
+            self.bno = None
+    
+    def get_compass_heading(self):
+        """Get the current compass heading in degrees (0-360)"""
+        if self.bno is None:
+            return None
+            
+        try:
+            # Get rotation vector (quaternion)
+            quat_i, quat_j, quat_k, quat_real = self.bno.quaternion
+            
+            # Convert quaternion to Euler angles
+            # Calculate yaw (heading) from quaternion
+            yaw = math.atan2(2.0 * (quat_real * quat_k + quat_i * quat_j),
+                           1.0 - 2.0 * (quat_j * quat_j + quat_k * quat_k))
+            
+            # Convert from radians to degrees and normalize to 0-360
+            heading = math.degrees(yaw)
+            if heading < 0:
+                heading += 360
+            
+            # Set initial heading on first reading
+            if self.initial_heading is None:
+                self.initial_heading = heading
+            
+            self.current_heading = heading
+            return heading
+            
+        except Exception as e:
+            print(f"Error reading compass heading: {e}")
+            return None
+    
+    def get_relative_heading(self):
+        """Get heading relative to initial orientation (0 = initial direction)"""
+        if self.bno is None or self.initial_heading is None:
+            return None
+            
+        current = self.get_compass_heading()
+        if current is None:
+            return None
+            
+        # Calculate relative heading
+        relative = current - self.initial_heading
+        if relative < 0:
+            relative += 360
+        elif relative >= 360:
+            relative -= 360
+            
+        return relative
+    
+    def get_imu_data(self):
+        """Get comprehensive IMU data including accelerometer, gyroscope, and magnetometer"""
+        if self.bno is None:
+            return None
+            
+        try:
+            data = {
+                'heading': self.get_compass_heading(),
+                'relative_heading': self.get_relative_heading(),
+                'acceleration': self.bno.acceleration,
+                'gyro': self.bno.gyro,
+                'magnetic': self.bno.magnetic
+            }
+            return data
+        except Exception as e:
+            print(f"Error reading IMU data: {e}")
+            return None
     
     def detect_ball(self, frame):
         hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
@@ -230,11 +328,25 @@ class SoccerRobot:
                             turn_mode = "TIGHT_TURN"
                     
                     direction = "LEFT" if error_x_norm < 0 else "RIGHT" if error_x_norm > 0 else "CENTER"
-                    print(f"Ball at ({ball_center[0]}, {ball_center[1]}) - Error: {error_x_norm:.2f} ({direction}) - {turn_mode} - Turn: {turn_adjustment//1000}k - Speeds: BL:{speeds[0]//1000}k BR:{speeds[1]//1000}k FL:{speeds[2]//1000}k FR:{speeds[3]//1000}k")
+                    
+                    # Get compass heading for display
+                    heading = self.get_compass_heading()
+                    relative_heading = self.get_relative_heading()
+                    heading_str = f"Heading: {heading:.1f}°" if heading is not None else "Heading: N/A"
+                    relative_str = f"Rel: {relative_heading:.1f}°" if relative_heading is not None else "Rel: N/A"
+                    
+                    print(f"Ball at ({ball_center[0]}, {ball_center[1]}) - Error: {error_x_norm:.2f} ({direction}) - {turn_mode} - Turn: {turn_adjustment//1000}k - Speeds: BL:{speeds[0]//1000}k BR:{speeds[1]//1000}k FL:{speeds[2]//1000}k FR:{speeds[3]//1000}k - {heading_str} ({relative_str})")
                 else:
                     # Stop motors when ball is not detected
                     self.stop_motors()
-                    print("Ball not found - motors stopped")
+                    
+                    # Get compass heading for display even when ball not found
+                    heading = self.get_compass_heading()
+                    relative_heading = self.get_relative_heading()
+                    heading_str = f"Heading: {heading:.1f}°" if heading is not None else "Heading: N/A"
+                    relative_str = f"Rel: {relative_heading:.1f}°" if relative_heading is not None else "Rel: N/A"
+                    
+                    print(f"Ball not found - motors stopped - {heading_str} ({relative_str})")
                 
                 for motor in self.motors:
                     motor.update_quick_data_readout()
