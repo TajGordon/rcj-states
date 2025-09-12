@@ -3,7 +3,6 @@ import busio
 import config
 import signal
 import sys
-from good.agents import blind_ball_chaser
 from imu import IMU
 from camera import Camera
 from tof_stuff import ToFArray
@@ -33,7 +32,7 @@ class Bot:
             self.camera.start()
             
             # Run the main agent logic
-            self.agent.run()
+            self.agent.run(config.target_goal)
             
         except KeyboardInterrupt:
             print("\nShutting down...")
