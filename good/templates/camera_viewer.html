@@ -426,14 +426,14 @@
         
         function reconnectCamera() {
             refreshFeed();
-            checkConnection();
+            if (socket) {
+                socket.emit('request_data');
+            }
         }
         
         // Camera feed event handlers
         cameraFeed.onload = function() {
-            if (!isConnected) {
-                checkConnection();
-            }
+            console.log('Camera feed loaded');
         };
         
         cameraFeed.onerror = function() {
@@ -443,16 +443,15 @@
             errorElement.style.display = 'block';
         };
         
-        // Start periodic updates
-        updateInterval = setInterval(checkConnection, 1000); // Check every second
-        
-        // Initial connection check
-        checkConnection();
+        // Initialize everything when page loads
+        window.addEventListener('load', function() {
+            initializeSocket();
+        });
         
         // Cleanup on page unload
         window.addEventListener('beforeunload', function() {
-            if (updateInterval) {
-                clearInterval(updateInterval);
+            if (socket) {
+                socket.disconnect();
             }
         });
     </script>
