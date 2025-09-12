@@ -69,13 +69,17 @@ class CameraWebServer:
             
             center = (int(x), int(y))
             radius = int(radius)
+            area = cv2.contourArea(largest_contour)
+            
+            # Print ball area for debugging
+            print(f"Ball detected - Area: {area:.1f}, Center: ({center[0]}, {center[1]}), Radius: {radius}")
             
             # Draw circle around detected ball
             cv2.circle(display_frame, center, radius, (0, 255, 0), 2)
             cv2.circle(display_frame, center, 2, (0, 255, 0), -1)
             
-            # Add text label
-            cv2.putText(display_frame, f"Ball: ({center[0]}, {center[1]})", 
+            # Add text label with area information
+            cv2.putText(display_frame, f"Ball: ({center[0]}, {center[1]}) Area: {area:.0f}", 
                        (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 0), 2)
         else:
             cv2.putText(display_frame, "No ball detected", 

@@ -24,11 +24,12 @@ class SoccerRobot:
         self.upper_orange = np.array([14,255,255]) #[14,255,255]
         
         # Define speed parameters before setup_motors() is called
-        self.max_speed = 15000000  # Increased from 10M to 15M
-        self.turn_speed = 9000000
-        self.forward_speed = 10000000
-        self.kp_turn = 1.0  # Increased from 0.8 to 1.0 for more responsive turning
-        self.kp_forward = 0.8  # Increased from 0.6 to 0.8 for more responsive forward movement
+        self.max_speed = 150000000  # Maximum speed for all movements
+        self.kp_turn = 2.0  # Turn sensitivity multiplier (increased for tighter turns)
+        self.kp_forward = 0.8  # Forward movement sensitivity multiplier
+        self.turn_threshold = 0.1  # Minimum error to start turning (reduces jitter)
+        self.tight_turn_factor = 0.3  # Reduce forward speed during turns for tighter turning
+        self.pure_turn_threshold = 0.4  # Error threshold for pure turning in place (no forward movement)
         
         self.i2c = busio.I2C(board.SCL, board.SDA)
         self.motors = []
@@ -43,7 +44,7 @@ class SoccerRobot:
         self.ball_detected = False
         
     def setup_motors(self, force_calibration=False):
-        # 4 omniwheels: 27-back, 28-right, 30-front, 26-left
+        # 4 omniwheels: 27-back left, 28-back right, 30-front left, 26-front right
         motor_addresses = [27, 28, 30, 26]
         
         for i, addr in enumerate(motor_addresses):
@@ -118,55 +119,75 @@ class SoccerRobot:
         return False, None, 0
     
     def calculate_motor_commands(self):
-        if not self.ball_detected or len(self.motors) < 4:
+        if len(self.motors) < 4:
             return [0, 0, 0, 0]
         
-        error_x = self.ball_center_x - self.frame_center_x
-        error_y = self.frame_center_y - self.ball_center_y
-        
-        error_x_norm = error_x / self.frame_center_x
-        error_y_norm = error_y / self.frame_center_y
+        # Calculate error from ball position to center of frame
+        if self.ball_detected:
+            error_x = self.ball_center_x - self.frame_center_x
+            error_y = self.frame_center_y - self.ball_center_y
+            
+            error_x_norm = error_x / self.frame_center_x
+            error_y_norm = error_y / self.frame_center_y
+        else:
+            # Default values when ball not detected
+            error_x_norm = 0
+            error_y_norm = 0
         
         # CUSTOM OMNIWHEEL CONFIGURATION
-        # Motors: [back(27), right(28), front(30), left(26)]
+        # Motors: [27-back left, 28-back right, 30-front left, 26-front right]
         # IMPORTANT: In this setup:
-        # - Left/Right motors control FORWARD/BACKWARD movement
-        # - Front/Back motors control STRAFING (left/right) movement
-        # - Turning affects all wheels in opposite directions
-        # - Front motor (30) is INVERTED to compensate for hardware wiring
-        # - Left motor (26) is INVERTED to compensate for hardware wiring
+        # - Front-left (30) and back-left (27) motors are inverted due to hardware orientation
+        # - For turning: left motors slow down, right motors speed up (to turn right)
+        # - For turning: right motors slow down, left motors speed up (to turn left)
 
-        # Base forward movement (uses left/right motors)
-        forward_speed = error_y_norm * self.forward_speed * self.kp_forward
+        # Calculate turning adjustment based on horizontal ball position
+        # Apply turn threshold to reduce jitter and unnecessary small adjustments
+        if abs(error_x_norm) < self.turn_threshold:
+            turn_adjustment = 0
+            is_turning = False
+        else:
+            # Positive error_x_norm means ball is to the right, so turn right
+            # Negative error_x_norm means ball is to the left, so turn left
+            turn_adjustment = error_x_norm * self.max_speed * self.kp_turn
+            is_turning = True
 
-        # Sideways movement (strafing, uses front/back motors)
-        strafe_speed = error_x_norm * self.forward_speed * self.kp_forward
+        # Base forward movement speed (based on max_speed)
+        # Reduce forward speed during turns for tighter turning radius
+        if is_turning:
+            if abs(error_x_norm) > self.pure_turn_threshold:
+                # Pure turning in place for large errors (minimal forward movement)
+                forward_speed = self.max_speed * self.kp_forward * 0.1
+            else:
+                # Reduced forward speed for moderate turns
+                forward_speed = self.max_speed * self.kp_forward * self.tight_turn_factor
+        else:
+            forward_speed = self.max_speed * self.kp_forward
 
-        # Turning movement
-        turn_speed = error_x_norm * self.turn_speed * self.kp_turn
+        # Calculate individual motor speeds with turning
+        # To turn right: slow down left motors, speed up right motors
+        # To turn left: slow down right motors, speed up left motors
+        
+        # Back-left motor (27): forward movement (INVERTED) + turn adjustment (inverted for left motor)
+        back_left_speed = -(forward_speed + turn_adjustment)
 
-        # Calculate individual motor speeds
-        # For pure spinning: opposite motors move in opposite directions
-        # Back motor (27): strafe - turn (moves left during clockwise spin)
-        back_speed = strafe_speed - turn_speed
+        # Back-right motor (28): forward movement - turn adjustment
+        back_right_speed = forward_speed - turn_adjustment
 
-        # Right motor (28): forward - turn (moves backward during clockwise spin)
-        right_speed = forward_speed - turn_speed
+        # Front-left motor (30): forward movement (INVERTED) + turn adjustment (inverted for left motor)
+        front_left_speed = -(forward_speed + turn_adjustment)
 
-        # Front motor (30): strafe + turn (INVERTED, moves right during clockwise spin)
-        front_speed = -(strafe_speed + turn_speed)
-
-        # Left motor (26): forward + turn (INVERTED, moves forward during clockwise spin)
-        left_speed = -(forward_speed + turn_speed)
+        # Front-right motor (26): forward movement - turn adjustment
+        front_right_speed = forward_speed - turn_adjustment
         
         # Clip speeds to max limits
-        speeds = [back_speed, right_speed, front_speed, left_speed]
+        speeds = [back_left_speed, back_right_speed, front_left_speed, front_right_speed]
         speeds = [np.clip(speed, -self.max_speed, self.max_speed) for speed in speeds]
         
         return [int(speed) for speed in speeds]
     
     def set_motor_speeds(self, speeds):
-        # speeds: [back(27), right(28), front(30), left(26)]
+        # speeds: [27-back left, 28-back right, 30-front left, 26-front right]
         if len(self.motors) >= 4 and len(speeds) >= 4:
             for i, speed in enumerate(speeds):
                 self.motors[i].set_speed(speed)
@@ -187,17 +208,38 @@ class SoccerRobot:
                 ball_found, ball_center, ball_radius = self.detect_ball(frame)
                 
                 if ball_found:
+                    # Move forward and turn towards ball when detected
                     speeds = self.calculate_motor_commands()
                     self.set_motor_speeds(speeds)
-                    print(f"Ball found at ({ball_center[0]}, {ball_center[1]}) - speeds: B:{speeds[0]//1000}k R:{speeds[1]//1000}k F:{speeds[2]//1000}k L:{speeds[3]//1000}k")
+                    
+                    # Calculate error for display
+                    error_x = ball_center[0] - self.frame_center_x
+                    error_x_norm = error_x / self.frame_center_x
+                    
+                    # Determine if turning and calculate turn adjustment for display
+                    if abs(error_x_norm) < self.turn_threshold:
+                        turn_adjustment = 0
+                        is_turning = False
+                        turn_mode = "STRAIGHT"
+                    else:
+                        turn_adjustment = error_x_norm * self.max_speed * self.kp_turn
+                        is_turning = True
+                        if abs(error_x_norm) > self.pure_turn_threshold:
+                            turn_mode = "PURE_TURN"
+                        else:
+                            turn_mode = "TIGHT_TURN"
+                    
+                    direction = "LEFT" if error_x_norm < 0 else "RIGHT" if error_x_norm > 0 else "CENTER"
+                    print(f"Ball at ({ball_center[0]}, {ball_center[1]}) - Error: {error_x_norm:.2f} ({direction}) - {turn_mode} - Turn: {turn_adjustment//1000}k - Speeds: BL:{speeds[0]//1000}k BR:{speeds[1]//1000}k FL:{speeds[2]//1000}k FR:{speeds[3]//1000}k")
                 else:
+                    # Stop motors when ball is not detected
                     self.stop_motors()
                     print("Ball not found - motors stopped")
                 
                 for motor in self.motors:
                     motor.update_quick_data_readout()
                 
-                time.sleep(0.1)  # Reduced frequency for headless operation
+                time.sleep(0.001)  # Reduced frequency for headless operation
                 
         except KeyboardInterrupt:
             print("shutting down...")
