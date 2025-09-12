@@ -90,8 +90,14 @@ class MotorController:
     def set_motor_speeds(self, speeds):
         """Direct motor speed control - speeds: [back_left, back_right, front_left, front_right]"""
         if len(self.motors) >= 4 and len(speeds) >= 4:
+            print(f"   🔧 SETTING MOTOR SPEEDS:")
+            motor_names = ['BL', 'BR', 'FL', 'FR']
             for i, speed in enumerate(speeds):
+                print(f"      {motor_names[i]} (motor {i}): {speed//1000}k")
                 self.motors[i].set_speed(speed)
+            print(f"   ✅ All motor speeds set")
+        else:
+            print(f"   ❌ ERROR: Not enough motors ({len(self.motors)}) or speeds ({len(speeds)})")
     
     def set_individual_motor_speed(self, motor_index, speed):
         """Set speed for individual motor (0=back_left, 1=back_right, 2=front_left, 3=front_right)"""
@@ -173,7 +179,10 @@ class MotorController:
         
         self.set_motor_speeds(speeds)
         
-        print(f"Moving {math.degrees(direction_rad):.1f}° at speed level {speed_level} ({movement_type}) - Speeds: BL:{speeds[0]//1000}k BR:{speeds[1]//1000}k FL:{speeds[2]//1000}k FR:{speeds[3]//1000}k")
+        print(f"🎮 MOTOR CONTROLLER - move_direction:")
+        print(f"   Input: direction={math.degrees(direction_rad):.1f}°, speed_level={speed_level}")
+        print(f"   Calculated speeds: BL:{speeds[0]//1000}k BR:{speeds[1]//1000}k FL:{speeds[2]//1000}k FR:{speeds[3]//1000}k")
+        print(f"   Forward component: {forward_speed//1000}k, Strafe component: {strafe_speed//1000}k")
     
     def move_with_rotation(self, direction_rad, move_speed_level, rotation_amount_rad, rotation_speed_level):
         """

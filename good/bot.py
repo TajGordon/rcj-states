@@ -29,7 +29,9 @@ class Bot:
         
         # Verify motor controller is ready
         if not self.motor_controller.are_motors_ready():
-            print("WARNING: Not all motors initialized properly")
+            print("⚠️  WARNING: Not all motors initialized properly")
+        else:
+            print("✅ Motor controller ready with all motors")
         
         # Setup signal handler for graceful shutdown
         signal.signal(signal.SIGINT, self._signal_handler)
