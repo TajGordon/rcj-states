@@ -4,10 +4,12 @@ import busio
 import config
 import signal
 import sys
+import threading
 from imu import IMU
 from camera import Camera
 from motor_controller import MotorController
 from agents.blind_ball_chaser import Agent
+from ball_chaser_web_server import BallChaserWebServer
 
 class Bot:
     def __init__(self):
@@ -21,6 +23,10 @@ class Bot:
         # Note: ToF and Localization not needed for simple ball following
         self.agent = Agent(bot=self)
         
+        # Initialize web server
+        self.web_server = BallChaserWebServer(self.camera, self.motor_controller, self.agent)
+        self.agent.set_web_server(self.web_server)
+        
         # Verify motor controller is ready
         if not self.motor_controller.are_motors_ready():
             print("WARNING: Not all motors initialized properly")
@@ -28,7 +34,7 @@ class Bot:
         # Setup signal handler for graceful shutdown
         signal.signal(signal.SIGINT, self._signal_handler)
 
-    def run(self):
+    def run(self, start_web_server=True, web_port=5000):
         try:
             # Start camera
             self.camera.start()
@@ -44,6 +50,10 @@ class Bot:
             
             print("Camera started successfully")
             
+            # Start web server in background thread if requested
+            if start_web_server:
+                self._start_web_server(web_port)
+            
             # Run the main agent logic with motor updates
             self._run_with_motor_updates()
             
@@ -52,11 +62,21 @@ class Bot:
         finally:
             self.stop()
     
+    def _start_web_server(self, port):
+        """Start web server in background thread"""
+        def run_web_server():
+            try:
+                self.web_server.run(host='0.0.0.0', port=port, debug=False)
+            except Exception as e:
+                print(f"Web server error: {e}")
+        
+        web_thread = threading.Thread(target=run_web_server, daemon=True)
+        web_thread.start()
+        print(f"Web server starting on http://0.0.0.0:{port}")
+        time.sleep(1)  # Give web server time to start
+    
     def _run_with_motor_updates(self):
         """Run agent with regular motor data updates"""
-        import threading
-        import time
-        
         # Flag to control the motor update thread
         self.motor_update_running = True
         
@@ -100,6 +120,25 @@ class Bot:
 
 
 if __name__ == "__main__":
+    print("🤖 Ball Chaser Robot with Web Interface")
+    print("=" * 50)
+    
     bot = Bot()
-    bot.run()
+    
+    try:
+        # Run with web server on port 5000
+        print("Starting bot with web interface...")
+        print("Web interface will be available at: http://localhost:5000")
+        print("Press Ctrl+C to stop")
+        print("=" * 50)
+        
+        bot.run(start_web_server=True, web_port=5000)
+        
+    except KeyboardInterrupt:
+        print("\nShutting down bot...")
+    except Exception as e:
+        print(f"Error running bot: {e}")
+    finally:
+        bot.stop()
+        print("Bot stopped successfully")
 

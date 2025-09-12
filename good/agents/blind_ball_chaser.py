@@ -44,6 +44,9 @@ class Agent:
         self.consecutive_errors = 0
         self.max_consecutive_errors = 5
         
+        # Web server integration
+        self.web_server = None
+        
     def run(self, target_goal):
         """
         Main agent loop - blindly chase the ball while avoiding boundaries.
@@ -146,6 +149,8 @@ class Agent:
                 self.bot.motor_controller.stop_motors()
                 self.current_movement_state = 'stopped'
                 self.last_command_time = current_time
+                self.last_command_direction = 0.0
+                self.last_command_speed = 0.0
                 print("Motors stopped")
                 
             elif command_type == 'move_direction':
@@ -172,6 +177,10 @@ class Agent:
             if self.consecutive_errors >= self.max_consecutive_errors:
                 print("Too many motor errors, stopping")
                 self.running = False
+    
+    def set_web_server(self, web_server):
+        """Set reference to web server for data sharing"""
+        self.web_server = web_server
     
     def _get_robot_heading(self):
         """Get current robot heading from IMU."""
