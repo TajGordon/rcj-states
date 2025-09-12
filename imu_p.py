@@ -21,7 +21,7 @@ class IMU:
         self.bno = None
         self.i2c = None
 
-        # Initialize BNO085 with timeout and better I2C handling
+        # Initialize BNO085 using the same pattern as soccer_robot.py
         try:
             print("Initializing BNO085 IMU...")
             
@@ -38,26 +38,16 @@ class IMU:
             else:
                 self.i2c = i2c
             
-            # Try to initialize BNO085 with timeout
-            import signal
+            # Initialize BNO085 using the standard I2C approach (same as soccer_robot.py)
+            self.bno = BNO08X_I2C(self.i2c)
             
-            def timeout_handler(signum, frame):
-                raise TimeoutError("BNO085 initialization timeout")
+            # Enable the reports we need
+            self.bno.enable_feature(BNO_REPORT_ACCELEROMETER)
+            self.bno.enable_feature(BNO_REPORT_GYROSCOPE)
+            self.bno.enable_feature(BNO_REPORT_MAGNETOMETER)
+            self.bno.enable_feature(BNO_REPORT_ROTATION_VECTOR)
             
-            signal.signal(signal.SIGALRM, timeout_handler)
-            signal.alarm(3)  # 3 second timeout
-            
-            try:
-                self.bno = BNO08X_I2C(self.i2c)
-                self.bno.enable_feature(BNO_REPORT_ACCELEROMETER)
-                self.bno.enable_feature(BNO_REPORT_GYROSCOPE)
-                self.bno.enable_feature(BNO_REPORT_MAGNETOMETER)
-                self.bno.enable_feature(BNO_REPORT_ROTATION_VECTOR)
-                signal.alarm(0)  # Cancel timeout
-                print("BNO085 IMU initialized successfully")
-            except TimeoutError:
-                signal.alarm(0)
-                raise TimeoutError("BNO085 not responding - check connections")
+            print("BNO085 IMU initialized successfully")
                 
         except Exception as e:
             print(f"BNO085 IMU initialization failed: {e}")
