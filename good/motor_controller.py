@@ -115,7 +115,15 @@ class MotorController:
             raise ValueError(f"Speed level must be between -8.0 and 8.0, got {speed_level}")
         if speed_level == 0:
             return 0
-        return speed_level * (1.0 / 8.0) * self.max_speed
+        
+        # Apply smoothing for low speeds to reduce jittering
+        if abs(speed_level) < 1.0:
+            # For very low speeds, apply additional smoothing
+            smoothed_level = speed_level * 0.8  # Reduce by 20% for smoother movement
+        else:
+            smoothed_level = speed_level
+            
+        return smoothed_level * (1.0 / 8.0) * self.max_speed
 
     def move_direction(self, direction_rad, speed_level, movement_type='relative'):
         """
@@ -464,6 +472,10 @@ class MotorController:
         """Update motor data readouts (call this regularly in main loop)"""
         for motor in self.motors:
             motor.update_quick_data_readout()
+    
+    def are_motors_ready(self):
+        """Check if all motors are properly initialized and ready"""
+        return len(self.motors) >= 4 and all(motor is not None for motor in self.motors)
 
     def run(self):
         """Main control loop - override this for your specific application"""

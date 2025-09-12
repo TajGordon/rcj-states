@@ -7,7 +7,8 @@ if hostname == 'storm':
     print('running on taj\'s bot')
     target_goal = 'blue'
     # front left: 26, front right: 27, back right: 29, back left: 25
-    motor_addresses = [25, 29, 26, 27]
+    # Motor addresses in order: [back_left, back_right, front_left, front_right]
+    motor_addresses = [25, 29, 26, 27]  # [bl, br, fl, fr]
     motor_addresses_named = {'fl': 26, 'fr': 27, 'bl': 25, 'br': 29}
     # idk if these get used
     # SINCOSCENTRE = {25: 1260, 26: 1250, 27: 1219, 29: 1256}
@@ -76,7 +77,8 @@ if hostname == 'storm':
 else:
     print(f'running on {hostname}, using default configuration')
     # Default configuration for development/testing
-    motor_addresses = [25, 29, 26, 27]
+    # Motor addresses in order: [back_left, back_right, front_left, front_right]
+    motor_addresses = [25, 29, 26, 27]  # [bl, br, fl, fr]
     motor_addresses_named = {'fl': 26, 'fr': 27, 'bl': 25, 'br': 29}
     
     # Default TOF configuration
