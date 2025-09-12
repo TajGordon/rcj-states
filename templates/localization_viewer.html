@@ -24,7 +24,11 @@
     </header>
     <main>
         <section>
-            <canvas id="view" width="2500" height="1900"></canvas>
+            <div class="panel" style="margin-bottom:12px;">
+                <div class="row"><span>Incoming payload (raw)</span><span></span></div>
+                <pre id="raw" style="max-height:480px; overflow:auto; background:#0a0c10; padding:8px; border:1px solid #1f2430; border-radius:6px; font-size:12px;"></pre>
+            </div>
+            <canvas id="view" width="2500" height="1900" style="display:none;"></canvas>
         </section>
         <aside class="panel">
             <div class="row"><span>WebSocket</span><span id="wsState" class="muted">—</span></div>
@@ -86,12 +90,10 @@
             });
         }
 
-        function draw(data) {
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
-            drawField(data.field || []);
-            drawBot(data.pose);
-            drawRays(data.pose, data.rays || []);
-
+        function updateStatsAndRaw(data) {
+            // Render raw JSON only (no canvas)
+            const rawEl = document.getElementById('raw');
+            rawEl.textContent = JSON.stringify(data, null, 2);
             rayCountEl.textContent = (data.rays || []).length;
 
             // FPS calc
@@ -131,7 +133,7 @@
                 try {
                     const msg = JSON.parse(ev.data);
                     if (msg.type === 'localization') {
-                        draw(msg.data);
+                        updateStatsAndRaw(msg.data);
                     }
                 } catch {}
             });
