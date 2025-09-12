@@ -61,13 +61,12 @@ class IMU:
                 
         except Exception as e:
             print(f"BNO085 IMU initialization failed: {e}")
-            print("IMU will return mock data")
-            self.bno = None
             if self.i2c and i2c is None:  # Only unlock if we created the I2C
                 try:
                     self.i2c.unlock()
                 except:
                     pass
+            raise RuntimeError(f"Failed to initialize BNO085 IMU: {e}")
 
         # Heading state
         self._heading_deg = 0.0
@@ -96,8 +95,7 @@ class IMU:
     def read_heading_deg(self):
         """Return absolute heading in degrees [0,360), derived from rotation vector."""
         if self.bno is None:
-            # Return mock heading that slowly rotates
-            return (time.time() * 0.1 * 180.0 / math.pi) % 360.0
+            raise RuntimeError("BNO085 IMU not initialized")
         
         try:
             qi, qj, qk, qr = self.bno.quaternion
@@ -108,14 +106,12 @@ class IMU:
                 heading += 360.0
             return heading
         except Exception as e:
-            print(f"Error reading IMU heading: {e}")
-            return 0.0
+            raise RuntimeError(f"Error reading IMU heading: {e}")
 
     def read_heading_rad(self):
         """Return absolute heading in radians [0, 2π)."""
         if self.bno is None:
-            # Return mock heading that slowly rotates
-            return (time.time() * 0.1) % (2.0 * math.pi)
+            raise RuntimeError("BNO085 IMU not initialized")
         
         try:
             qi, qj, qk, qr = self.bno.quaternion
@@ -125,8 +121,7 @@ class IMU:
                 yaw += 2.0 * math.pi
             return yaw
         except Exception as e:
-            print(f"Error reading IMU heading: {e}")
-            return 0.0
+            raise RuntimeError(f"Error reading IMU heading: {e}")
 
     def read_relative_heading_deg(self):
         """Heading relative to first measurement (0 = initial orientation)."""
@@ -153,13 +148,17 @@ class IMU:
         return rel
 
     def get_cached_heading_deg(self):
+        if self.bno is None:
+            raise RuntimeError("BNO085 IMU not initialized")
         with self._lock:
             return self._heading_deg
 
     def get_cached_heading_rad(self):
+        if self.bno is None:
+            raise RuntimeError("BNO085 IMU not initialized")
         with self._lock:
             # convert cached degrees to radians
-            return (self._heading_deg or 0.0) * math.pi / 180.0
+            return self._heading_deg * math.pi / 180.0
 
 
 if __name__ == '__main__':
