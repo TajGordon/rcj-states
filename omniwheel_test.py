@@ -3,6 +3,7 @@ import sys
 import board
 import busio
 from steelbar_powerful_bldc_driver import PowerfulBLDCDriver
+import config
 
 class OmniwheelTest:
     def __init__(self):
@@ -18,11 +19,9 @@ class OmniwheelTest:
         
     def setup_motors(self, force_calibration=False):
         # 4 omniwheels: 27-back left, 28-back right, 30-front left, 26-front right
-        motor_addresses = [27, 28, 30, 26]
-        
         print("Setting up omniwheel motors...")
         
-        for i, addr in enumerate(motor_addresses):
+        for i, addr in enumerate(config.motor_addresses):
             print(f"Initializing motor {i} at address {addr}...")
             motor = PowerfulBLDCDriver(self.i2c, addr)
             
