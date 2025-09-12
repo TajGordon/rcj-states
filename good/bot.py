@@ -17,7 +17,7 @@ class Bot:
         
         # Initialize components with shared I2C instance
         self.motor_controller = MotorController(i2c=self.i2c)
-        self.camera = Camera()
+        self.camera = Camera(enable_frame_queue=True, detection_mode='enhanced')
         self.imu = IMU(i2c=self.i2c)
         self.tof = ToFArray(self.i2c)
         self.localization = Localization()
