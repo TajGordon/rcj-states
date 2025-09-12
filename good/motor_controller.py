@@ -11,19 +11,19 @@ import config
 class MotorController:
     def __init__(self, force_calibration=False):
         # Motor configuration
-        self.max_speed = 150000000  # Maximum speed for all movements
+        self.max_speed = 10_000_000  # Maximum speed for all movements
         self.max_current = 4 * 65536  # 4A current limit (4 * 65536 for the driver)
         
         # Speed levels (1-8) with corresponding multipliers
         self.speed_levels = {
-            1: 0.125,  # 12.5% of max speed
-            2: 0.25,   # 25% of max speed
-            3: 0.375,  # 37.5% of max speed
-            4: 0.5,    # 50% of max speed
-            5: 0.625,  # 62.5% of max speed
-            6: 0.75,   # 75% of max speed
-            7: 0.875,  # 87.5% of max speed
-            8: 1.0     # 100% of max speed
+            1: 0.125/2,  # 12.5% of max speed
+            2: 0.25/2,   # 25% of max speed
+            3: 0.375/2,  # 37.5% of max speed
+            4: 0.5/2,    # 50% of max speed
+            5: 0.625/2,  # 62.5% of max speed
+            6: 0.75/2,   # 75% of max speed
+            7: 0.875/2,  # 87.5% of max speed
+            8: 1.0/2     # 100% of max speed
         }
         
         # Initialize I2C and motors

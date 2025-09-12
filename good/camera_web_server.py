@@ -25,8 +25,7 @@ class CameraWebServer:
         self.port = port
         
         # Initialize camera with frame queue enabled for web streaming and enhanced detection
-        # Try fisheye correction first, fall back to enhanced detection if no calibration
-        self.camera = Camera(enable_frame_queue=True, enable_undistort=True, detection_mode='enhanced')
+        self.camera = Camera(enable_frame_queue=True, detection_mode='enhanced')
         
         # Flask app with SocketIO
         self.app = Flask(__name__, template_folder='templates')
@@ -95,21 +94,6 @@ class CameraWebServer:
             except Exception as e:
                 return jsonify({'success': False, 'error': str(e)})
         
-        @self.app.route('/api/calibration_status')
-        def api_calibration_status():
-            """API endpoint to check calibration status."""
-            try:
-                import os
-                calibration_exists = os.path.exists('camera_calibration.json')
-                camera_info = self.camera.get_camera_info()
-                return jsonify({
-                    'calibration_file_exists': calibration_exists,
-                    'undistort_enabled': camera_info.get('undistort_enabled', False),
-                    'detection_mode': camera_info.get('detection_mode', 'unknown'),
-                    'calibration_needed': not calibration_exists
-                })
-            except Exception as e:
-                return jsonify({'error': str(e)})
     
     def _setup_socket_events(self):
         """Setup WebSocket events."""
@@ -196,7 +180,6 @@ class CameraWebServer:
                 'fps': self.current_fps,
                 'is_running': camera_info['is_running'],
                 'frame_queue_available': camera_info['frame_queue_available'],
-                'undistort_enabled': camera_info.get('undistort_enabled', False),
                 'detection_mode': camera_info.get('detection_mode', 'unknown')
             }
             self.socketio.emit('camera_info', info_data)
