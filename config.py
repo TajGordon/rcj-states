@@ -35,6 +35,9 @@ if hostname == 'storm':
         92: 57,
         90: 111.5
     }
+    """ localization stuff """
+    localization_step_sizes = [10, 7, 5, 5, 3, 3, 2, 2, 1, 1, 1] # sorted in order that they will be searched, mm
+
 
 else: # assuming siddak bot rn
     motor_addresses = [27, 28, 30, 26]

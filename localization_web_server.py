@@ -3,7 +3,7 @@ import threading
 import time
 import math
 
-from flask import Flask, render_template
+from flask import Flask, render_template, jsonify
 from flask_sock import Sock
 
 try:
@@ -118,14 +118,21 @@ stream.start()
 def index():
     return render_template("localization_viewer.html")
 
+@app.route("/snapshot")
+def snapshot_http():
+    # Debug endpoint to verify data path without websockets
+    return jsonify({"type": "localization", "data": stream.get_snapshot()})
 
 @sock.route("/ws")
 def ws(ws):
     try:
+        print("WS: client connected")
         while True:
-            ws.send(json.dumps({"type": "localization", "data": stream.get_snapshot()}))
+            payload = {"type": "localization", "data": stream.get_snapshot()}
+            ws.send(json.dumps(payload))
             time.sleep(0.05)
     except Exception:
+        print("WS: client disconnected or error")
         return
 
 

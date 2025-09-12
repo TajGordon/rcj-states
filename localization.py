@@ -121,6 +121,64 @@ def load_rust_field_geometry(field: FieldMap):
     field.add_rectangles_bulk(rects)
 
 
+def build_centered_field_with_margins() -> FieldMap:
+    """Build a field with origin at center (0,0), outer walls at ±W/±H, and 250mm no-go margins.
+
+    Field size: 2430 x 1820 mm. Origin (0,0) at center.
+    Adds:
+      - Outer boundary walls (thin rectangles as segments)
+      - 250mm margin bands along each wall as obstacles
+      - Goals as in the Rust geometry, shifted to center-origin
+    """
+    W = 2430.0
+    H = 1820.0
+    hx = W / 2.0
+    hy = H / 2.0
+    margin = 250.0
+    line_thickness = 50.0
+    goal_internal_width = 450.0
+    goal_internal_depth = 74.0
+    goal_box_width = 300.0
+    goal_box_height = 900.0
+    distance_from_goal_start_to_middle = 915.0
+
+    f = FieldMap()
+
+    # Outer walls (thin rectangles of 10mm thickness)
+    wall_t = 10.0
+    f.add_rectangles_bulk([
+        (-hx - 10.0, -hy - 10.0,  hx + 10.0, -hy),      # top
+        (-hx - 10.0, -hy,         -hx,        hy),       # left
+        (-hx - 10.0,  hy,          hx + 10.0, hy + 10.0),# bottom
+        ( hx,        -hy,           hx + 10.0, hy),      # right
+    ])
+
+    # Margin bands (250mm inside each wall)
+    f.add_rectangles_bulk([
+        (-hx, -hy,  hx, -hy + margin),             # top margin band
+        (-hx,  hy - margin,  hx,  hy),             # bottom margin band
+        (-hx, -hy, -hx + margin,  hy),             # left margin band
+        ( hx - margin, -hy,  hx,  hy),             # right margin band
+    ])
+
+    # Goals: copy from Rust and shift by (-hx, -hy)
+    rects_rust = [
+        # goal left
+        (0.0, 600.0, 140.0, 610.0),
+        (56.0, 610.0, 66.0, 1210.0),
+        (0.0, 1210.0, 140.0, 1220.0),
+        # goal right
+        (2430.0 - 140.0, 600.0, 2430.0, 610.0),
+        (2430.0 - 66.0, 610.0, 2430.0 - 56.0, 1210.0),
+        (2430.0 - 140.0, 1210.0, 2430.0, 1220.0),
+    ]
+    shifted = [(x1 - hx, y1 - hy, x2 - hx, y2 - hy) for (x1, y1, x2, y2) in rects_rust]
+    f.add_rectangles_bulk(shifted)
+
+    return f
+
+
+
 class LocalizationManager:
     def __init__(self, i2c, field_map: FieldMap):
         self.imu = IMU(i2c)
