@@ -6,6 +6,7 @@ import sys
 from steelbar_powerful_bldc_driver import PowerfulBLDCDriver
 import board
 import busio
+import config
 from picamera2 import Picamera2
 from adafruit_bno08x import (
     BNO_REPORT_ACCELEROMETER,
@@ -20,7 +21,7 @@ class SoccerRobot:
         # Initialize Pi Camera
         self.picam2 = Picamera2()
         self.picam2.configure(self.picam2.create_video_configuration(
-            main={"size": (640, 480), "format": "RGB888"}
+            main={"size": (640, 640), "format": "RGB888"}
         ))
         self.picam2.start()
         
@@ -55,10 +56,11 @@ class SoccerRobot:
         self.ball_detected = False
         
     def setup_motors(self, force_calibration=False):
+        # use config.motor_addresses
         # 4 omniwheels: 27-back left, 28-back right, 30-front left, 26-front right
-        motor_addresses = [27, 28, 30, 26]
+        # motor_addresses = [27, 28, 30, 26]
         
-        for i, addr in enumerate(motor_addresses):
+        for i, addr in enumerate(config.motor_addresses):
             motor = PowerfulBLDCDriver(self.i2c, addr)
             
             if motor.get_firmware_version() != 3:
