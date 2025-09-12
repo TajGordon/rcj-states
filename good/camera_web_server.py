@@ -1,6 +1,7 @@
 import cv2
 import time
 import threading
+import math
 from flask import Flask, render_template, Response, jsonify
 from camera import Camera
 
@@ -77,23 +78,30 @@ class CameraWebServer:
             try:
                 ball_x, ball_y = self.camera.get_ball_position()
                 ball_radius = self.camera.get_ball_radius()
+                ball_angle = self.camera.get_ball_angle()
                 ball_detected = self.camera.is_ball_detected()
                 
                 if ball_detected and ball_x is not None and ball_y is not None:
                     # Calculate area from radius
                     area = 3.14159 * (ball_radius ** 2)
+                    # Convert angle to degrees for display
+                    angle_degrees = math.degrees(ball_angle)
                     return jsonify({
                         'detected': True,
                         'center': [ball_x, ball_y],
                         'radius': ball_radius,
-                        'area': area
+                        'area': area,
+                        'angle_rad': ball_angle,
+                        'angle_deg': angle_degrees
                     })
                 else:
                     return jsonify({
                         'detected': False,
                         'center': [None, None],
                         'radius': 0,
-                        'area': 0
+                        'area': 0,
+                        'angle_rad': 0.0,
+                        'angle_deg': 0.0
                     })
             except Exception as e:
                 return jsonify({'error': str(e)})
@@ -220,13 +228,17 @@ class CameraWebServer:
             cv2.putText(annotated_frame, distance_text, (ball_x + 20, ball_y - 20), 
                        cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 255), 2)
             
-            # Add angle from center (simplified)
-            angle = 0
-            if ball_x != center_x:
-                angle = 180 * (ball_y - center_y) / (ball_x - center_x) / 3.14159
-            angle_text = f"Angle: {angle:.1f}°"
+            # Add angle information (both radians and degrees)
+            angle_rad = self.camera.get_ball_angle()
+            angle_deg = math.degrees(angle_rad)
+            angle_text = f"Angle: {angle_rad:.3f} rad ({angle_deg:.1f}°)"
             cv2.putText(annotated_frame, angle_text, (ball_x + 20, ball_y + 10), 
                        cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 255), 2)
+            
+            # Add angle range indicator (0-2π)
+            range_text = f"Range: 0-{2*math.pi:.3f} rad (0-360°)"
+            cv2.putText(annotated_frame, range_text, (ball_x + 20, ball_y + 30), 
+                       cv2.FONT_HERSHEY_SIMPLEX, 0.4, (0, 255, 255), 1)
         
         return annotated_frame
     

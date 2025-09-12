@@ -3,16 +3,18 @@ from multiprocessing import Process, Queue, Event, Value, Array
 import cv2
 import numpy as np
 import time
+import math
 from picamera2 import Picamera2
 import threading
 
-def camera_process(ball_position, ball_radius, ball_detected, stop_event, frame_queue=None):
+def camera_process(ball_position, ball_radius, ball_angle, ball_detected, stop_event, frame_queue=None):
     """
     Separate process that handles camera capture and ball detection.
     
     Args:
         ball_position: Shared array [x, y] for ball center position
         ball_radius: Shared value for ball radius
+        ball_angle: Shared value for ball angle in radians (0 = straight forward, clockwise)
         ball_detected: Shared value (0/1) indicating if ball is detected
         stop_event: Event to signal process to stop
         frame_queue: Optional queue to send processed frames to other processes
@@ -28,6 +30,10 @@ def camera_process(ball_position, ball_radius, ball_detected, stop_event, frame_
         # Ball detection parameters (orange ball)
         lower_orange = np.array([0, 132, 61])
         upper_orange = np.array([14, 255, 255])
+        
+        # Camera center for angle calculation
+        camera_center_x = 320  # 640 / 2
+        camera_center_y = 320  # 640 / 2
         
         print("Camera process started successfully")
         
@@ -50,6 +56,20 @@ def camera_process(ball_position, ball_radius, ball_detected, stop_event, frame_
                     largest_contour = max(filtered_contours, key=cv2.contourArea)
                     (x, y), radius = cv2.minEnclosingCircle(largest_contour)
                     
+                    # Calculate angle from camera center to ball
+                    # Convert to normalized coordinates (-1 to 1)
+                    norm_x = (x - camera_center_x) / camera_center_x
+                    norm_y = (y - camera_center_y) / camera_center_y
+                    
+                    # Calculate angle in radians
+                    # atan2 gives angle from positive x-axis, we want from positive y-axis (forward)
+                    # and clockwise direction, so we adjust the calculation
+                    angle = math.atan2(norm_x, -norm_y)  # -norm_y because y increases downward in image
+                    
+                    # Ensure angle is in range [0, 2π)
+                    if angle < 0:
+                        angle += 2 * math.pi
+                    
                     # Update shared memory with ball position
                     with ball_position.get_lock():
                         ball_position[0] = int(x)
@@ -57,6 +77,9 @@ def camera_process(ball_position, ball_radius, ball_detected, stop_event, frame_
                     
                     with ball_radius.get_lock():
                         ball_radius.value = int(radius)
+                    
+                    with ball_angle.get_lock():
+                        ball_angle.value = angle
                     
                     with ball_detected.get_lock():
                         ball_detected.value = 1
@@ -80,6 +103,10 @@ def camera_process(ball_position, ball_radius, ball_detected, stop_event, frame_
                     # No ball detected
                     with ball_detected.get_lock():
                         ball_detected.value = 0
+                    
+                    # Reset angle when no ball detected
+                    with ball_angle.get_lock():
+                        ball_angle.value = 0.0
                     
                     # Optional: send frame without ball
                     if frame_queue is not None:
@@ -126,6 +153,9 @@ class Camera:
         # Shared memory for ball radius
         self.ball_radius = Value('i', 0)
         
+        # Shared memory for ball angle in radians
+        self.ball_angle = Value('d', 0.0)  # 'd' for double precision float
+        
         # Shared memory for ball detection status (0 = not detected, 1 = detected)
         self.ball_detected = Value('i', 0)
         
@@ -150,7 +180,7 @@ class Camera:
         try:
             self.camera_process = Process(
                 target=camera_process,
-                args=(self.ball_position, self.ball_radius, self.ball_detected, 
+                args=(self.ball_position, self.ball_radius, self.ball_angle, self.ball_detected, 
                       self.stop_event, self.frame_queue)
             )
             self.camera_process.start()
@@ -221,6 +251,26 @@ class Camera:
         else:
             return 0
     
+    def get_ball_angle(self):
+        """
+        Get the current ball angle in radians.
+        
+        Returns:
+            float: Ball angle in radians (0 = straight forward, clockwise from 0 to 2π), 
+                   or 0.0 if no ball detected
+        """
+        if not self.is_running:
+            return 0.0
+            
+        with self.ball_detected.get_lock():
+            detected = self.ball_detected.value
+            
+        if detected:
+            with self.ball_angle.get_lock():
+                return self.ball_angle.value
+        else:
+            return 0.0
+    
     def is_ball_detected(self):
         """
         Check if a ball is currently detected.
@@ -264,6 +314,7 @@ class Camera:
             'ball_detected': self.is_ball_detected(),
             'ball_position': (ball_x, ball_y),
             'ball_radius': self.get_ball_radius(),
+            'ball_angle': self.get_ball_angle(),
             'frame_queue_available': self.frame_queue is not None
         }
     
@@ -298,7 +349,9 @@ def main():
             if info['ball_detected']:
                 x, y = info['ball_position']
                 radius = info['ball_radius']
-                print(f"Ball detected at ({x}, {y}) with radius {radius}")
+                angle = info['ball_angle']
+                angle_deg = math.degrees(angle)
+                print(f"Ball detected at ({x}, {y}) with radius {radius}, angle {angle:.3f} rad ({angle_deg:.1f}°)")
             else:
                 print("No ball detected")
     

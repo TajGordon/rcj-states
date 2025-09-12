@@ -252,6 +252,18 @@
                     <span class="info-label">Area:</span>
                     <span class="info-value" id="ballArea">N/A</span>
                 </div>
+                <div class="info-item">
+                    <span class="info-label">Angle (rad):</span>
+                    <span class="info-value" id="ballAngleRad">N/A</span>
+                </div>
+                <div class="info-item">
+                    <span class="info-label">Angle (deg):</span>
+                    <span class="info-value" id="ballAngleDeg">N/A</span>
+                </div>
+                <div class="info-item">
+                    <span class="info-label">Range:</span>
+                    <span class="info-value" id="angleRange">0-6.283 rad (0-360°)</span>
+                </div>
             </div>
         </div>
     </div>
@@ -275,6 +287,9 @@
         const ballCenter = document.getElementById('ballCenter');
         const ballRadius = document.getElementById('ballRadius');
         const ballArea = document.getElementById('ballArea');
+        const ballAngleRad = document.getElementById('ballAngleRad');
+        const ballAngleDeg = document.getElementById('ballAngleDeg');
+        const angleRange = document.getElementById('angleRange');
         
         let isConnected = false;
         let updateInterval;
@@ -354,12 +369,16 @@
                         ballCenter.textContent = `(${data.center[0]}, ${data.center[1]})`;
                         ballRadius.textContent = `${data.radius}px`;
                         ballArea.textContent = `${data.area.toFixed(0)}px²`;
+                        ballAngleRad.textContent = `${data.angle_rad.toFixed(3)} rad`;
+                        ballAngleDeg.textContent = `${data.angle_deg.toFixed(1)}°`;
                     } else {
                         ballDetected.textContent = 'No';
                         ballDetected.className = 'ball-not-detected';
                         ballCenter.textContent = 'N/A';
                         ballRadius.textContent = 'N/A';
                         ballArea.textContent = 'N/A';
+                        ballAngleRad.textContent = 'N/A';
+                        ballAngleDeg.textContent = 'N/A';
                     }
                 })
                 .catch(error => {
