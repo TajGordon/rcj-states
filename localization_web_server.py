@@ -13,7 +13,9 @@ try:
 except Exception:
     HARDWARE = False
 
-from localization import FieldMap, load_rust_field_geometry, LocalizationManager, Pose
+from localization import FieldMap, load_rust_field_geometry
+from IMU import IMU
+from tof_stuff import ToFArray
 
 
 class LocalizationStream:
@@ -48,24 +50,17 @@ class LocalizationStream:
 
     def _run(self):
         if HARDWARE:
-            i2c = busio.I2C(board.SCL, board.SDA)
-            while not i2c.try_lock():
-                time.sleep(0.001)
             try:
-                lm = LocalizationManager(i2c, self.field)
-                # Initial guess: center-ish of field, 0 heading
-                current_pose = Pose(1215.0, 910.0, 0.0)
+                i2c = busio.I2C(board.SCL, board.SDA)
+                imu = IMU(i2c)
+                tof = ToFArray(i2c)
+
+                # Use field center as a neutral visualization position; client can ignore x,y
+                x_mm, y_mm = 1215.0, 910.0
 
                 while self.running:
-                    # Get live sensor pairs
-                    pairs = lm.get_sensor_pairs(fresh=False)
-                    # Heading from IMU
-                    theta = lm.imu.read_heading_rad()
-                    current_pose = Pose(current_pose.x_mm, current_pose.y_mm, theta)
-
-                    # Optionally refine pose (lock angle to IMU)
-                    est = lm.estimate_pose(initial=current_pose, angle_span_rad=0.0)
-                    current_pose = est
+                    pairs = tof.get_localization_pairs(fresh=False)
+                    theta = imu.read_heading_rad()
 
                     rays = [
                         {"angle_rad": a, "distance_mm": d}
@@ -74,35 +69,40 @@ class LocalizationStream:
 
                     snap = {
                         "field": self.field_segments,
-                        "pose": {"x_mm": current_pose.x_mm, "y_mm": current_pose.y_mm, "theta_rad": current_pose.theta_rad},
+                        "pose": {"x_mm": x_mm, "y_mm": y_mm, "theta_rad": theta},
                         "rays": rays,
                     }
                     with self.lock:
                         self.snapshot_data = snap
 
                     time.sleep(0.05)
-            finally:
-                i2c.unlock()
+            except Exception as e:
+                print(f"Localization hardware stream failed: {e}")
+                # fallback to mock loop if hardware init fails
+                self._run_mock()
         else:
             # Mock stream for development
-            t = 0.0
-            pose = {"x_mm": 1215.0, "y_mm": 910.0, "theta_rad": 0.0}
-            angles = [0, math.radians(35), math.radians(90), math.radians(125), math.radians(180), math.radians(215), math.radians(270), math.radians(305)]
-            while self.running:
-                pose["theta_rad"] = (pose["theta_rad"] + 0.01) % (2 * math.pi)
-                rays = []
-                for i, a in enumerate(angles):
-                    dist = 1000 + 400 * (0.5 * (1 + math.sin(t + i * 0.7)))
-                    rays.append({"angle_rad": a, "distance_mm": int(dist)})
-                snap = {
-                    "field": self.field_segments,
-                    "pose": pose.copy(),
-                    "rays": rays,
-                }
-                with self.lock:
-                    self.snapshot_data = snap
-                t += 0.05
-                time.sleep(0.05)
+            self._run_mock()
+
+    def _run_mock(self):
+        t = 0.0
+        pose = {"x_mm": 1215.0, "y_mm": 910.0, "theta_rad": 0.0}
+        angles = [0, math.radians(35), math.radians(90), math.radians(125), math.radians(180), math.radians(215), math.radians(270), math.radians(305)]
+        while self.running:
+            pose["theta_rad"] = (pose["theta_rad"] + 0.01) % (2 * math.pi)
+            rays = []
+            for i, a in enumerate(angles):
+                dist = 1000 + 400 * (0.5 * (1 + math.sin(t + i * 0.7)))
+                rays.append({"angle_rad": a, "distance_mm": int(dist)})
+            snap = {
+                "field": self.field_segments,
+                "pose": pose.copy(),
+                "rays": rays,
+            }
+            with self.lock:
+                self.snapshot_data = snap
+            t += 0.05
+            time.sleep(0.05)
 
 
 app = Flask(__name__)
