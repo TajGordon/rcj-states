@@ -2,7 +2,9 @@ import cv2
 import time
 import threading
 import math
+import json
 from flask import Flask, render_template, Response, jsonify
+from flask_socketio import SocketIO, emit
 from camera import Camera
 
 class CameraWebServer:
@@ -25,8 +27,9 @@ class CameraWebServer:
         # Initialize camera with frame queue enabled for web streaming
         self.camera = Camera(enable_frame_queue=True)
         
-        # Flask app
+        # Flask app with SocketIO
         self.app = Flask(__name__, template_folder='templates')
+        self.socketio = SocketIO(self.app, cors_allowed_origins="*")
         
         # Frame processing
         self.current_frame = None
@@ -38,12 +41,20 @@ class CameraWebServer:
         self.last_fps_update = time.time()
         self.current_fps = 0
         
-        # Setup routes
+        # WebSocket clients
+        self.connected_clients = 0
+        
+        # Setup routes and socket events
         self._setup_routes()
+        self._setup_socket_events()
         
         # Start frame processing thread
         self.frame_thread = threading.Thread(target=self._process_frames)
         self.frame_thread.daemon = True
+        
+        # Start data broadcasting thread
+        self.data_thread = threading.Thread(target=self._broadcast_data)
+        self.data_thread.daemon = True
         
     def _setup_routes(self):
         """Setup Flask routes for the web interface."""
@@ -58,68 +69,6 @@ class CameraWebServer:
             """Video streaming endpoint."""
             return Response(self._generate_frames(),
                           mimetype='multipart/x-mixed-replace; boundary=frame')
-        
-        @self.app.route('/api/status')
-        def api_status():
-            """API endpoint for connection status."""
-            try:
-                camera_info = self.camera.get_camera_info()
-                return jsonify({
-                    'connected': camera_info['is_running'],
-                    'has_frame': self.current_frame is not None,
-                    'camera_status': camera_info
-                })
-            except Exception as e:
-                return jsonify({'error': str(e), 'connected': False, 'has_frame': False})
-        
-        @self.app.route('/api/ball_data')
-        def api_ball_data():
-            """API endpoint for ball detection data."""
-            try:
-                ball_x, ball_y = self.camera.get_ball_position()
-                ball_radius = self.camera.get_ball_radius()
-                ball_angle = self.camera.get_ball_angle()
-                ball_detected = self.camera.is_ball_detected()
-                
-                if ball_detected and ball_x is not None and ball_y is not None:
-                    # Calculate area from radius
-                    area = 3.14159 * (ball_radius ** 2)
-                    # Convert angle to degrees for display
-                    angle_degrees = math.degrees(ball_angle)
-                    return jsonify({
-                        'detected': True,
-                        'center': [ball_x, ball_y],
-                        'radius': ball_radius,
-                        'area': area,
-                        'angle_rad': ball_angle,
-                        'angle_deg': angle_degrees
-                    })
-                else:
-                    return jsonify({
-                        'detected': False,
-                        'center': [None, None],
-                        'radius': 0,
-                        'area': 0,
-                        'angle_rad': 0.0,
-                        'angle_deg': 0.0
-                    })
-            except Exception as e:
-                return jsonify({'error': str(e)})
-        
-        @self.app.route('/api/camera_info')
-        def api_camera_info():
-            """API endpoint for camera information."""
-            try:
-                camera_info = self.camera.get_camera_info()
-                return jsonify({
-                    'width': 640,  # Camera resolution from camera.py
-                    'height': 640,  # Updated to match your change
-                    'fps': self.current_fps,
-                    'is_running': camera_info['is_running'],
-                    'frame_queue_available': camera_info['frame_queue_available']
-                })
-            except Exception as e:
-                return jsonify({'error': str(e)})
         
         @self.app.route('/api/start_camera')
         def api_start_camera():
@@ -144,6 +93,109 @@ class CameraWebServer:
                     return jsonify({'success': False, 'message': 'Camera not running'})
             except Exception as e:
                 return jsonify({'success': False, 'error': str(e)})
+    
+    def _setup_socket_events(self):
+        """Setup WebSocket events."""
+        
+        @self.socketio.on('connect')
+        def handle_connect():
+            """Handle client connection."""
+            self.connected_clients += 1
+            print(f"Client connected. Total clients: {self.connected_clients}")
+            
+            # Send initial data
+            self._send_camera_status()
+            self._send_ball_data()
+            self._send_camera_info()
+        
+        @self.socketio.on('disconnect')
+        def handle_disconnect():
+            """Handle client disconnection."""
+            self.connected_clients -= 1
+            print(f"Client disconnected. Total clients: {self.connected_clients}")
+        
+        @self.socketio.on('request_data')
+        def handle_data_request():
+            """Handle data request from client."""
+            self._send_camera_status()
+            self._send_ball_data()
+            self._send_camera_info()
+    
+    def _send_camera_status(self):
+        """Send camera status via WebSocket."""
+        try:
+            camera_info = self.camera.get_camera_info()
+            status_data = {
+                'connected': camera_info['is_running'],
+                'has_frame': self.current_frame is not None,
+                'camera_status': camera_info
+            }
+            self.socketio.emit('camera_status', status_data)
+        except Exception as e:
+            self.socketio.emit('camera_status', {'error': str(e), 'connected': False, 'has_frame': False})
+    
+    def _send_ball_data(self):
+        """Send ball detection data via WebSocket."""
+        try:
+            ball_x, ball_y = self.camera.get_ball_position()
+            ball_radius = self.camera.get_ball_radius()
+            ball_angle = self.camera.get_ball_angle()
+            ball_detected = self.camera.is_ball_detected()
+            
+            if ball_detected and ball_x is not None and ball_y is not None:
+                # Calculate area from radius
+                area = 3.14159 * (ball_radius ** 2)
+                # Convert angle to degrees for display
+                angle_degrees = math.degrees(ball_angle)
+                ball_data = {
+                    'detected': True,
+                    'center': [ball_x, ball_y],
+                    'radius': ball_radius,
+                    'area': area,
+                    'angle_rad': ball_angle,
+                    'angle_deg': angle_degrees
+                }
+            else:
+                ball_data = {
+                    'detected': False,
+                    'center': [None, None],
+                    'radius': 0,
+                    'area': 0,
+                    'angle_rad': 0.0,
+                    'angle_deg': 0.0
+                }
+            
+            self.socketio.emit('ball_data', ball_data)
+        except Exception as e:
+            self.socketio.emit('ball_data', {'error': str(e)})
+    
+    def _send_camera_info(self):
+        """Send camera information via WebSocket."""
+        try:
+            camera_info = self.camera.get_camera_info()
+            info_data = {
+                'width': 640,  # Camera resolution from camera.py
+                'height': 640,  # Updated to match your change
+                'fps': self.current_fps,
+                'is_running': camera_info['is_running'],
+                'frame_queue_available': camera_info['frame_queue_available']
+            }
+            self.socketio.emit('camera_info', info_data)
+        except Exception as e:
+            self.socketio.emit('camera_info', {'error': str(e)})
+    
+    def _broadcast_data(self):
+        """Continuously broadcast data to connected clients."""
+        while True:
+            try:
+                if self.connected_clients > 0:
+                    self._send_camera_status()
+                    self._send_ball_data()
+                    self._send_camera_info()
+                time.sleep(0.1)  # 10 Hz update rate
+            except Exception as e:
+                print(f"Error broadcasting data: {e}")
+                time.sleep(1)
     
     def _process_frames(self):
         """Process frames from the camera module and add additional annotations."""
@@ -278,12 +330,15 @@ class CameraWebServer:
             # Start frame processing thread
             self.frame_thread.start()
             
+            # Start data broadcasting thread
+            self.data_thread.start()
+            
             print("Camera initialized successfully")
             print("Open your web browser and navigate to the URL above to view the camera feed")
             print("Press Ctrl+C to stop the server")
             
-            # Run Flask app
-            self.app.run(host=self.host, port=self.port, debug=False, threaded=True)
+            # Run Flask app with SocketIO
+            self.socketio.run(self.app, host=self.host, port=self.port, debug=False)
             
         except KeyboardInterrupt:
             print("\nShutting down web server...")
