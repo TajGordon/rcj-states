@@ -53,7 +53,7 @@ class ToFStream:
                         self.latest = [
                             {"angle_rad": a, "distance_mm": d} for (a, d) in pairs
                         ]
-                    time.sleep(0.05)
+                    time.sleep(0.02)
             finally:
                 i2c.unlock()
         else:
@@ -69,7 +69,7 @@ class ToFStream:
                 with self.lock:
                     self.latest = items
                 t += 0.1
-                time.sleep(0.05)
+                time.sleep(0.02)
 
 
 app = Flask(__name__)
@@ -89,7 +89,7 @@ def ws(ws):
         while True:
             payload = {"type": "tof_readings", "data": stream.snapshot()}
             ws.send(json.dumps(payload))
-            time.sleep(0.1)
+            time.sleep(0.05)
     except Exception:
         return
 

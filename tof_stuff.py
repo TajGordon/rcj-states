@@ -41,7 +41,7 @@ class SteelBarToF:
                 else:
                     return self.last_distance
             
-            time.sleep(0.00001)
+            time.sleep(0.000001)
     
     def current_measurement(self):
         return self._read(wait_for_new=False)
