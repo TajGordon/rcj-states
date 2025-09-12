@@ -103,7 +103,7 @@ if __name__ == "__main__":
     # tof_count = int(input('how many tofs do you want: '))
     try:
         if mode == 'single':
-            tof = SteelBarToF(i2c, 0x50, 0, 41.5)
+            tof = SteelBarToF(i2c, 0x56, 0, 41.5)
             while True:
                 d = tof.next_measurement()
                 print(f"{d} mm")
