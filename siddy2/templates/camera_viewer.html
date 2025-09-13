@@ -1,0 +1,543 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Soccer Bot Camera Viewer</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 20px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+            overflow: hidden;
+        }
+        
+        .header {
+            background: linear-gradient(135deg, #2c3e50 0%, #34495e 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+        
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
+        }
+        
+        .header p {
+            font-size: 1.2em;
+            opacity: 0.9;
+        }
+        
+        .main-content {
+            display: grid;
+            grid-template-columns: 2fr 1fr;
+            gap: 30px;
+            padding: 30px;
+        }
+        
+        .video-section {
+            background: #f8f9fa;
+            border-radius: 15px;
+            padding: 20px;
+            box-shadow: 0 10px 20px rgba(0, 0, 0, 0.1);
+        }
+        
+        .video-container {
+            position: relative;
+            border-radius: 10px;
+            overflow: hidden;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
+        }
+        
+        .video-stream {
+            width: 100%;
+            height: auto;
+            display: block;
+            background: #000;
+        }
+        
+        .video-overlay {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            background: rgba(0, 0, 0, 0.7);
+            color: white;
+            padding: 10px 15px;
+            border-radius: 5px;
+            font-size: 0.9em;
+        }
+        
+        .info-panel {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+        
+        .info-card {
+            background: white;
+            border-radius: 15px;
+            padding: 25px;
+            box-shadow: 0 10px 20px rgba(0, 0, 0, 0.1);
+            border-left: 5px solid #3498db;
+        }
+        
+        .info-card h3 {
+            color: #2c3e50;
+            margin-bottom: 15px;
+            font-size: 1.3em;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .status-indicator {
+            display: inline-block;
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-weight: bold;
+            font-size: 0.9em;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        
+        .status-detected {
+            background: linear-gradient(135deg, #27ae60, #2ecc71);
+            color: white;
+            box-shadow: 0 4px 15px rgba(46, 204, 113, 0.3);
+        }
+        
+        .status-not-detected {
+            background: linear-gradient(135deg, #e74c3c, #c0392b);
+            color: white;
+            box-shadow: 0 4px 15px rgba(231, 76, 60, 0.3);
+        }
+        
+        .data-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+            gap: 15px;
+            margin-top: 20px;
+        }
+        
+        .data-item {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 10px;
+            text-align: center;
+            border: 2px solid #e9ecef;
+            transition: all 0.3s ease;
+        }
+        
+        .data-item:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+            border-color: #3498db;
+        }
+        
+        .data-label {
+            font-size: 0.8em;
+            color: #6c757d;
+            margin-bottom: 8px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        
+        .data-value {
+            font-size: 1.4em;
+            font-weight: bold;
+            color: #2c3e50;
+        }
+        
+        .controls {
+            background: white;
+            border-radius: 15px;
+            padding: 25px;
+            box-shadow: 0 10px 20px rgba(0, 0, 0, 0.1);
+            text-align: center;
+        }
+        
+        .btn {
+            background: linear-gradient(135deg, #3498db, #2980b9);
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            margin: 5px;
+            border-radius: 25px;
+            cursor: pointer;
+            font-size: 1em;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            transition: all 0.3s ease;
+            box-shadow: 0 5px 15px rgba(52, 152, 219, 0.3);
+        }
+        
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(52, 152, 219, 0.4);
+        }
+        
+        .btn.danger {
+            background: linear-gradient(135deg, #e74c3c, #c0392b);
+            box-shadow: 0 5px 15px rgba(231, 76, 60, 0.3);
+        }
+        
+        .btn.danger:hover {
+            box-shadow: 0 8px 25px rgba(231, 76, 60, 0.4);
+        }
+        
+        .btn.success {
+            background: linear-gradient(135deg, #27ae60, #2ecc71);
+            box-shadow: 0 5px 15px rgba(39, 174, 96, 0.3);
+        }
+        
+        .btn.success:hover {
+            box-shadow: 0 8px 25px rgba(39, 174, 96, 0.4);
+        }
+        
+        .footer {
+            background: #2c3e50;
+            color: white;
+            padding: 20px;
+            text-align: center;
+            font-size: 0.9em;
+        }
+        
+        .connection-status {
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            margin-right: 8px;
+            animation: pulse 2s infinite;
+        }
+        
+        .connection-status.connected {
+            background: #27ae60;
+        }
+        
+        .connection-status.disconnected {
+            background: #e74c3c;
+        }
+        
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.5; }
+            100% { opacity: 1; }
+        }
+        
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-top: 20px;
+        }
+        
+        .stat-item {
+            background: linear-gradient(135deg, #f8f9fa, #e9ecef);
+            padding: 20px;
+            border-radius: 10px;
+            text-align: center;
+            border: 2px solid #dee2e6;
+        }
+        
+        .stat-value {
+            font-size: 2em;
+            font-weight: bold;
+            color: #2c3e50;
+            margin-bottom: 5px;
+        }
+        
+        .stat-label {
+            color: #6c757d;
+            font-size: 0.9em;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        
+        @media (max-width: 768px) {
+            .main-content {
+                grid-template-columns: 1fr;
+            }
+            
+            .header h1 {
+                font-size: 2em;
+            }
+            
+            .data-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🤖 Soccer Bot Camera Viewer</h1>
+            <p>Real-time ball detection and camera monitoring system</p>
+        </div>
+        
+        <div class="main-content">
+            <div class="video-section">
+                <div class="video-container">
+                    <img src="{{ url_for('video_feed') }}" class="video-stream" alt="Live Camera Feed">
+                    <div class="video-overlay">
+                        <span class="connection-status connected" id="connection-status"></span>
+                        <span id="connection-text">Live Stream Active</span>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="info-panel">
+                <div class="info-card">
+                    <h3>🎯 Ball Detection Status</h3>
+                    <div id="ball-status" class="status-indicator status-not-detected">No Ball Detected</div>
+                    
+                    <div class="data-grid">
+                        <div class="data-item">
+                            <div class="data-label">Ball X</div>
+                            <div class="data-value" id="ball-x">--</div>
+                        </div>
+                        <div class="data-item">
+                            <div class="data-label">Ball Y</div>
+                            <div class="data-value" id="ball-y">--</div>
+                        </div>
+                        <div class="data-item">
+                            <div class="data-label">Radius</div>
+                            <div class="data-value" id="ball-radius">--</div>
+                        </div>
+                        <div class="data-item">
+                            <div class="data-label">Area</div>
+                            <div class="data-value" id="ball-area">--</div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="info-card">
+                    <h3>📊 Detection Statistics</h3>
+                    <div class="stats-grid">
+                        <div class="stat-item">
+                            <div class="stat-value" id="detection-count">0</div>
+                            <div class="stat-label">Detections</div>
+                        </div>
+                        <div class="stat-item">
+                            <div class="stat-value" id="uptime">00:00</div>
+                            <div class="stat-label">Uptime</div>
+                        </div>
+                        <div class="stat-item">
+                            <div class="stat-value" id="fps">30</div>
+                            <div class="stat-label">FPS</div>
+                        </div>
+                        <div class="stat-item">
+                            <div class="stat-value" id="last-seen">--</div>
+                            <div class="stat-label">Last Seen</div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="info-card">
+                    <h3>🎮 System Controls</h3>
+                    <div class="controls">
+                        <button class="btn success" onclick="startDetection()">▶️ Start Detection</button>
+                        <button class="btn" onclick="pauseDetection()">⏸️ Pause</button>
+                        <button class="btn danger" onclick="stopServer()">⏹️ Stop Server</button>
+                        <button class="btn" onclick="refreshData()">🔄 Refresh</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="footer">
+            <p>🤖 Soccer Bot Camera System | Real-time Ball Detection | 
+               <span id="last-updated">Last updated: Never</span>
+            </p>
+        </div>
+    </div>
+
+    <script>
+        // Global variables
+        let detectionCount = 0;
+        let startTime = Date.now();
+        let lastDetectionTime = null;
+        let frameCount = 0;
+        let fpsStartTime = Date.now();
+        
+        // Initialize the interface
+        function init() {
+            updateUptime();
+            setInterval(updateUptime, 1000);
+            setInterval(updateFPS, 1000);
+            console.log('Soccer Bot Camera Viewer initialized');
+        }
+        
+        // Update uptime display
+        function updateUptime() {
+            const elapsed = Date.now() - startTime;
+            const minutes = Math.floor(elapsed / 60000);
+            const seconds = Math.floor((elapsed % 60000) / 1000);
+            document.getElementById('uptime').textContent = 
+                `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+        }
+        
+        // Update FPS counter
+        function updateFPS() {
+            const now = Date.now();
+            const elapsed = (now - fpsStartTime) / 1000;
+            const fps = Math.round(frameCount / elapsed);
+            document.getElementById('fps').textContent = fps;
+            frameCount = 0;
+            fpsStartTime = now;
+        }
+        
+        // Simulate ball detection data (since the server doesn't provide JSON endpoint)
+        function simulateDetectionData() {
+            // This simulates what would come from a real detection API
+            const ballDetected = Math.random() > 0.7; // 30% chance of detection
+            
+            if (ballDetected) {
+                const ballX = Math.floor(Math.random() * 640);
+                const ballY = Math.floor(Math.random() * 480);
+                const radius = Math.floor(Math.random() * 50) + 10;
+                const area = Math.floor(Math.PI * radius * radius);
+                
+                updateBallDetection(true, ballX, ballY, radius, area);
+                lastDetectionTime = new Date();
+            } else {
+                updateBallDetection(false);
+            }
+            
+            frameCount++;
+        }
+        
+        // Update ball detection display
+        function updateBallDetection(detected, x, y, radius, area) {
+            const statusElement = document.getElementById('ball-status');
+            const connectionStatus = document.getElementById('connection-status');
+            const connectionText = document.getElementById('connection-text');
+            
+            if (detected) {
+                statusElement.textContent = 'Ball Detected';
+                statusElement.className = 'status-indicator status-detected';
+                
+                document.getElementById('ball-x').textContent = x;
+                document.getElementById('ball-y').textContent = y;
+                document.getElementById('ball-radius').textContent = radius;
+                document.getElementById('ball-area').textContent = area;
+                
+                detectionCount++;
+                document.getElementById('detection-count').textContent = detectionCount;
+                
+                if (lastDetectionTime) {
+                    document.getElementById('last-seen').textContent = 
+                        lastDetectionTime.toLocaleTimeString();
+                }
+                
+                connectionStatus.className = 'connection-status connected';
+                connectionText.textContent = 'Ball Detected - Live Stream';
+            } else {
+                statusElement.textContent = 'No Ball Detected';
+                statusElement.className = 'status-indicator status-not-detected';
+                
+                document.getElementById('ball-x').textContent = '--';
+                document.getElementById('ball-y').textContent = '--';
+                document.getElementById('ball-radius').textContent = '--';
+                document.getElementById('ball-area').textContent = '--';
+                
+                connectionStatus.className = 'connection-status connected';
+                connectionText.textContent = 'Live Stream Active';
+            }
+            
+            // Update last updated time
+            document.getElementById('last-updated').textContent = 
+                `Last updated: ${new Date().toLocaleTimeString()}`;
+        }
+        
+        // Control functions
+        function startDetection() {
+            console.log('Starting ball detection...');
+            // In a real implementation, this would send a command to the server
+            alert('Ball detection started!');
+        }
+        
+        function pauseDetection() {
+            console.log('Pausing ball detection...');
+            // In a real implementation, this would send a command to the server
+            alert('Ball detection paused!');
+        }
+        
+        function stopServer() {
+            if (confirm('Are you sure you want to stop the server?')) {
+                console.log('Stopping server...');
+                // In a real implementation, this would send a command to the server
+                alert('Server stop command sent!');
+            }
+        }
+        
+        function refreshData() {
+            console.log('Refreshing data...');
+            // Force refresh the video stream
+            const videoStream = document.querySelector('.video-stream');
+            const currentSrc = videoStream.src;
+            videoStream.src = '';
+            setTimeout(() => {
+                videoStream.src = currentSrc;
+            }, 100);
+        }
+        
+        // Handle video stream errors
+        function handleVideoError() {
+            const connectionStatus = document.getElementById('connection-status');
+            const connectionText = document.getElementById('connection-text');
+            
+            connectionStatus.className = 'connection-status disconnected';
+            connectionText.textContent = 'Connection Lost';
+            
+            console.error('Video stream connection lost');
+        }
+        
+        // Add event listeners
+        document.addEventListener('DOMContentLoaded', function() {
+            init();
+            
+            // Add error handling for video stream
+            const videoStream = document.querySelector('.video-stream');
+            videoStream.addEventListener('error', handleVideoError);
+            
+            // Simulate detection data updates (remove this in production)
+            // setInterval(simulateDetectionData, 100);
+        });
+        
+        // Handle page visibility changes
+        document.addEventListener('visibilitychange', function() {
+            if (document.hidden) {
+                console.log('Page hidden - reducing update frequency');
+            } else {
+                console.log('Page visible - resuming normal updates');
+            }
+        });
+        
+        // Handle window resize
+        window.addEventListener('resize', function() {
+            console.log('Window resized - adjusting layout');
+        });
+    </script>
+</body>
+</html>
