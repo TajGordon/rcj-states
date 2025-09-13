@@ -289,8 +289,8 @@ class Agent:
         # Use YOUR hardware max speed (not soccer_bot's)
         max_speed = self.bot.motor_controller.max_speed  # 30,000,000 for your setup
         
-        # Soccer bot control parameters (these work well, so keep them)
-        kp_turn = 2.0
+        # Soccer bot control parameters (reduced turn sensitivity to prevent spinning)
+        kp_turn = 0.5  # Reduced from 2.0 to prevent aggressive turning
         kp_forward = 0.8
         turn_threshold = 0.1
         tight_turn_factor = 0.3
@@ -314,10 +314,11 @@ class Agent:
         print(f"      Effective max speed: {effective_max_speed//1000}k")
         
         # Calculate turning adjustment based on horizontal ball position (soccer_bot method)
-        if abs(error_x_norm) < turn_threshold:
+        # TEMPORARY: Force straight movement to test if motors work correctly
+        if True:  # abs(error_x_norm) < turn_threshold:
             turn_adjustment = 0
             is_turning = False
-            print(f"      Turn mode: STRAIGHT (error < {turn_threshold})")
+            print(f"      Turn mode: FORCED_STRAIGHT (testing mode)")
         else:
             # Use nonlinear turning response
             error_sign = 1 if error_x_norm > 0 else -1
@@ -365,6 +366,12 @@ class Agent:
         speeds = [int(max(-effective_max_speed, min(effective_max_speed, speed))) for speed in speeds]
         
         print(f"      Final speeds: BL:{speeds[0]//1000}k BR:{speeds[1]//1000}k FL:{speeds[2]//1000}k FR:{speeds[3]//1000}k")
+        
+        # Debug: Check if all motors are going in the same direction (which would cause spinning)
+        if all(speed > 0 for speed in speeds) or all(speed < 0 for speed in speeds):
+            print(f"      ⚠️  WARNING: All motors same direction - will cause spinning!")
+        elif speeds[0] * speeds[1] > 0 and speeds[2] * speeds[3] > 0:
+            print(f"      ⚠️  WARNING: Left/right motors same direction - will cause spinning!")
         
         return speeds
     
