@@ -27,8 +27,9 @@ class SoccerRobot:
         # Create a dummy cap object for compatibility with existing code
         self.cap = None
        
-        self.lower_orange = np.array([0,132,61]) #[0,132,61]
-        self.upper_orange = np.array([14,255,255]) #[14,255,255]
+        # Expanded HSV range for better orange ball detection
+        self.lower_orange = np.array([0,50,30])  # More inclusive lower bound
+        self.upper_orange = np.array([25,255,255])  # More inclusive upper bound
        
         # Define speed parameters before setup_motors() is called
         self.max_speed = 150000000  # Maximum speed for all movements
@@ -211,12 +212,16 @@ class SoccerRobot:
         hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
         mask = cv2.inRange(hsv, self.lower_orange, self.upper_orange)
         contours, _ = cv2.findContours(mask, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
- 
+
+        # Debug: Count orange pixels
+        orange_pixels = np.sum(mask > 0)
+        print(f"Orange pixels detected: {orange_pixels}, Contours found: {len(contours)}")
+
         for contour in contours:
             print(f"Contour Area: {cv2.contourArea(contour)}")
  
-        # Filter contours by area - reduced minimum area to detect smaller balls (radius ~7 or smaller)
-        filtered_contours = [x for x in contours if cv2.contourArea(x) > 20 and cv2.contourArea(x) < 30000]
+        # Filter contours by area - very low minimum area to detect any orange objects
+        filtered_contours = [x for x in contours if cv2.contourArea(x) > 5 and cv2.contourArea(x) < 50000]
  
         contours = filtered_contours
  
@@ -403,6 +408,16 @@ class SoccerRobot:
        
         return [int(speed) for speed in speeds]
    
+    def calculate_search_commands(self):
+        """Calculate motor commands for searching when no ball is detected."""
+        # Turn left to search for ball
+        turn_speed = self.max_speed * 0.3  # 30% of max speed for searching
+        
+        # Left turn: left motors backward, right motors forward
+        speeds = [-turn_speed, turn_speed, -turn_speed, turn_speed]
+        
+        return [int(speed) for speed in speeds]
+   
     def set_motor_speeds(self, speeds):
         # speeds: [27-back left, 28-back right, 30-front left, 26-front right]
         if len(self.motors) >= 4 and len(speeds) >= 4:
@@ -521,7 +536,11 @@ class SoccerRobot:
                         recent_area = self.ball_position_history[-1]['area']
                         history_info = f" - Last ball area: {recent_area:.1f}px²"
                    
-                    print(f"Ball not found - motors stopped{history_info} - {heading_str} ({relative_str})")
+                    # Search for ball by turning when not found
+                    print(f"Ball not found - searching by turning{history_info} - {heading_str} ({relative_str})")
+                    # Turn left to search for ball
+                    search_speeds = self.calculate_search_commands()
+                    self.set_motor_speeds(search_speeds)
                
                 for motor in self.motors:
                     motor.update_quick_data_readout()
