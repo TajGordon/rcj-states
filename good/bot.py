@@ -128,13 +128,13 @@ if __name__ == "__main__":
     bot = Bot()
     
     try:
-        # Run with web server on port 5000
-        print("Starting bot with web interface...")
-        print("Web interface will be available at: http://localhost:5000")
+        # Run without web server - fully autonomous ball chasing
+        print("Starting autonomous ball chasing bot...")
+        print("Bot will automatically chase the ball when detected")
         print("Press Ctrl+C to stop")
         print("=" * 50)
         
-        bot.run(start_web_server=True, web_port=5000)
+        bot.run(start_web_server=False)
         
     except KeyboardInterrupt:
         print("\nShutting down bot...")

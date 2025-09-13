@@ -13,10 +13,10 @@ class Agent:
         self.bot = bot
         self.running = False
         
-        # Movement parameters - REDUCED SPEEDS for smoother movement
-        self.base_speed_level = 2.0  # Base speed when chasing ball (reduced from 6)
-        self.slow_speed_level = 1.0  # Speed when close to ball (reduced from 3)
-        self.fast_speed_level = 3.0  # Speed when far from ball (reduced from 8)
+        # Movement parameters - INCREASED SPEEDS for faster movement
+        self.base_speed_level = 5.0  # Base speed when chasing ball (increased from 2.0)
+        self.slow_speed_level = 3.0  # Speed when close to ball (increased from 1.0)
+        self.fast_speed_level = 7.0  # Speed when far from ball (increased from 3.0)
         
         # Distance thresholds (in pixels)
         self.close_distance = 80   # Close to ball
@@ -31,14 +31,14 @@ class Agent:
         # Movement state tracking to reduce command frequency
         self.current_movement_state = 'stopped'  # 'stopped', 'moving', 'turning'
         self.last_command_time = 0
-        self.min_command_interval = 0.1  # Minimum 100ms between commands
+        self.min_command_interval = 0.05  # Minimum 50ms between commands (reduced for responsiveness)
         self.last_command_direction = 0.0
         self.last_command_speed = 0.0
         
         # Movement thresholds to avoid micro-adjustments
-        self.min_angle_change = math.radians(5)  # 5 degrees minimum change
+        self.min_angle_change = math.radians(2)  # 2 degrees minimum change (reduced for responsiveness)
         self.min_speed_change = 0.5  # Minimum speed level change
-        self.min_distance_change = 20  # Minimum distance change in pixels
+        self.min_distance_change = 10  # Minimum distance change in pixels (reduced for responsiveness)
         
         # Error handling
         self.consecutive_errors = 0
@@ -298,13 +298,13 @@ class Agent:
         # Determine rotation direction and speed
         if error_x_norm > 0:
             # Ball is to the right, rotate right (clockwise)
-            rotation_speed = min(0.3, abs(error_x_norm) * 2.0)  # Scale rotation speed
+            rotation_speed = min(0.8, abs(error_x_norm) * 4.0)  # Increased rotation speed
             print(f"      Rotating RIGHT (clockwise) at speed {rotation_speed:.2f}")
             print(f"      DEBUG: About to call _safe_motor_command('rotate', {rotation_speed}, 'right')")
             self._safe_motor_command('rotate', rotation_speed, 'right')
         else:
             # Ball is to the left, rotate left (counter-clockwise)
-            rotation_speed = min(0.3, abs(error_x_norm) * 2.0)  # Scale rotation speed
+            rotation_speed = min(0.8, abs(error_x_norm) * 4.0)  # Increased rotation speed
             print(f"      Rotating LEFT (counter-clockwise) at speed {rotation_speed:.2f}")
             print(f"      DEBUG: About to call _safe_motor_command('rotate', {rotation_speed}, 'left')")
             self._safe_motor_command('rotate', rotation_speed, 'left')
