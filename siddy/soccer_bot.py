@@ -33,10 +33,10 @@ class SoccerRobot:
        
         # Precise movement parameters for straight-line tracking
         self.max_speed = 100000000  # Maximum speed for all movements (controlled but fast)
-        self.kp_turn = 1.0  # Turn sensitivity multiplier (precise, not aggressive)
+        self.kp_turn = 2.0  # Turn sensitivity multiplier (precise, not aggressive)
         self.kp_forward = 0.8  # Forward movement sensitivity multiplier (good forward speed)
         self.turn_threshold = 0.1  # Minimum error to start turning (reduces jitter, more stable)
-        self.tight_turn_factor = 0.3  # Reduce forward speed during turns (maintains straightness)
+        self.tight_turn_factor = 0.7  # Reduce forward speed during turns (maintains straightness)
         self.pure_turn_threshold = 0.2  # Error threshold for pure turning in place (less aggressive)
         self.nonlinear_turn_power = 0.7  # Power for nonlinear turning (gentler response)
        
