@@ -28,34 +28,16 @@ def camera_process(ball_position, ball_radius, ball_angle, ball_detected, stop_e
         ))
         picam2.start()
         
-        # Enhanced ball detection parameters (orange ball) - multiple ranges for better detection
-        orange_ranges = [
-            (np.array([0, 132, 61]), np.array([14, 255, 255])),    # Original range
-            (np.array([0, 100, 50]), np.array([20, 255, 255])),    # Wider range
-            (np.array([0, 80, 40]), np.array([25, 255, 255])),     # Even wider
-            (np.array([0, 60, 30]), np.array([30, 255, 255])),     # Very wide for poor lighting
-        ]
-        
-        # Additional color ranges for different lighting conditions
-        lighting_ranges = [
-            (np.array([0, 50, 20]), np.array([35, 255, 255])),     # Low light
-            (np.array([0, 40, 15]), np.array([40, 255, 255])),     # Very low light
-        ]
+        # Simple ball detection parameters (orange ball) - copied from soccer_bot.py
+        lower_orange = np.array([0, 132, 61])
+        upper_orange = np.array([14, 255, 255])
         
         # Camera center for angle calculation
         camera_center_x = 320  # 640 / 2
         camera_center_y = 320  # 640 / 2
         
-        # Detection parameters based on mode
-        if detection_mode == 'basic':
-            min_area, max_area = 100, 30000
-            min_circularity = 0.3
-        elif detection_mode == 'enhanced':
-            min_area, max_area = 50, 50000
-            min_circularity = 0.2
-        else:  # adaptive
-            min_area, max_area = 30, 80000
-            min_circularity = 0.15
+        # Simple detection parameters (copied from soccer_bot.py)
+        # No complex filtering - just area-based filtering
         
         print(f"Camera process started successfully - Detection mode: {detection_mode}")
         
@@ -69,70 +51,13 @@ def camera_process(ball_position, ball_radius, ball_angle, ball_detected, stop_e
                 # Add your object detection code here if needed
                 # ============================================================================
                 
-                # Convert to HSV for ball detection
-                hsv_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
+                # Convert to HSV for ball detection (copied from soccer_bot.py)
+                hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
+                mask = cv2.inRange(hsv, lower_orange, upper_orange)
+                contours, _ = cv2.findContours(mask, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
                 
-                # Enhanced ball detection with multiple color ranges
-                combined_mask = np.zeros(hsv_frame.shape[:2], dtype=np.uint8)
-                
-                # Try primary orange ranges first
-                for lower, upper in orange_ranges:
-                    mask = cv2.inRange(hsv_frame, lower, upper)
-                    combined_mask = cv2.bitwise_or(combined_mask, mask)
-                
-                # If no detection, try lighting compensation ranges
-                if np.sum(combined_mask) < 100:  # Very few pixels detected
-                    for lower, upper in lighting_ranges:
-                        mask = cv2.inRange(hsv_frame, lower, upper)
-                        combined_mask = cv2.bitwise_or(combined_mask, mask)
-                
-                # Create circular mask to exclude robot area in center
-                # Robot is in the center, so exclude a circular area around center
-                robot_mask_radius = 80  # Radius of area to exclude (adjust as needed)
-                robot_mask = np.zeros(combined_mask.shape, dtype=np.uint8)
-                cv2.circle(robot_mask, (camera_center_x, camera_center_y), robot_mask_radius, 255, -1)
-                
-                # Apply robot mask to exclude center area from ball detection
-                combined_mask = cv2.bitwise_and(combined_mask, cv2.bitwise_not(robot_mask))
-                
-                # Apply morphological operations to clean up the mask
-                kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (5, 5))
-                combined_mask = cv2.morphologyEx(combined_mask, cv2.MORPH_OPEN, kernel)
-                combined_mask = cv2.morphologyEx(combined_mask, cv2.MORPH_CLOSE, kernel)
-                
-                # Additional noise reduction
-                kernel_small = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3, 3))
-                combined_mask = cv2.morphologyEx(combined_mask, cv2.MORPH_OPEN, kernel_small)
-                
-                # Find contours
-                contours, _ = cv2.findContours(combined_mask, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
-                
-                # Enhanced contour filtering with improved criteria
-                filtered_contours = []
-                for contour in contours:
-                    area = cv2.contourArea(contour)
-                    if min_area <= area <= max_area:
-                        # Check circularity (how round the shape is)
-                        perimeter = cv2.arcLength(contour, True)
-                        if perimeter > 0:
-                            circularity = 4 * np.pi * area / (perimeter * perimeter)
-                            if circularity >= min_circularity:
-                                # Additional checks for better ball detection
-                                x, y, w, h = cv2.boundingRect(contour)
-                                aspect_ratio = float(w) / h
-                                
-                                # Check if contour is roughly circular
-                                if 0.5 <= aspect_ratio <= 2.0:  # Not too elongated
-                                    # Additional check: convexity (how "filled" the shape is)
-                                    hull = cv2.convexHull(contour)
-                                    hull_area = cv2.contourArea(hull)
-                                    if hull_area > 0:
-                                        convexity = area / hull_area
-                                        if convexity >= 0.7:  # Shape should be mostly convex
-                                            # Check solidity (area vs convex hull)
-                                            solidity = area / cv2.contourArea(cv2.convexHull(contour))
-                                            if solidity >= 0.6:  # Should be fairly solid
-                                                filtered_contours.append(contour)
+                # Filter contours by area - reduced minimum area to detect smaller balls (radius ~7 or smaller)
+                filtered_contours = [x for x in contours if cv2.contourArea(x) > 20 and cv2.contourArea(x) < 30000]
                 
                 if filtered_contours:
                     largest_contour = max(filtered_contours, key=cv2.contourArea)
@@ -176,12 +101,6 @@ def camera_process(ball_position, ball_radius, ball_angle, ball_detected, stop_e
                         cv2.putText(display_frame, f"Ball: ({center[0]}, {center[1]})", 
                                    (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 0), 2)
                         
-                        # Draw robot exclusion area for visualization
-                        cv2.circle(display_frame, (camera_center_x, camera_center_y), robot_mask_radius, (255, 0, 0), 2)
-                        cv2.putText(display_frame, "Robot Area", 
-                                   (camera_center_x - 40, camera_center_y - robot_mask_radius - 10), 
-                                   cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 0, 0), 1)
-                        
                         # Try to put frame in queue (non-blocking)
                         try:
                             frame_queue.put_nowait(display_frame)
@@ -201,12 +120,6 @@ def camera_process(ball_position, ball_radius, ball_angle, ball_detected, stop_e
                         display_frame = frame.copy()
                         cv2.putText(display_frame, "No ball detected", 
                                    (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 0, 0), 2)
-                        
-                        # Draw robot exclusion area for visualization
-                        cv2.circle(display_frame, (camera_center_x, camera_center_y), robot_mask_radius, (255, 0, 0), 2)
-                        cv2.putText(display_frame, "Robot Area", 
-                                   (camera_center_x - 40, camera_center_y - robot_mask_radius - 10), 
-                                   cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 0, 0), 1)
                         try:
                             frame_queue.put_nowait(display_frame)
                         except:
