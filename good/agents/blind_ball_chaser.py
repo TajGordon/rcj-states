@@ -275,6 +275,8 @@ class Agent:
         print(f"      Error X: {error_x}px (norm: {error_x_norm:.3f})")
         print(f"      Error Y: {error_y}px (norm: {error_y_norm:.3f})")
         print(f"      Direction: {'RIGHT' if error_x > 0 else 'LEFT' if error_x < 0 else 'CENTER'}")
+        print(f"      Ball position: ({ball_x}, {ball_y})")
+        print(f"      Frame center: ({frame_center_x}, {frame_center_y})")
         
         # Calculate motor speeds using soccer_bot method
         speeds = self._calculate_motor_speeds_soccer_bot_style(error_x_norm, error_y_norm, ball_distance)
@@ -340,6 +342,7 @@ class Agent:
         
         print(f"      Forward speed: {forward_speed//1000}k")
         print(f"      Turn adjustment: {turn_adjustment//1000}k")
+        print(f"      Turn direction: {'RIGHT' if turn_adjustment > 0 else 'LEFT' if turn_adjustment < 0 else 'STRAIGHT'}")
         
         # Calculate individual motor speeds (soccer_bot method adapted for your hardware)
         # Motors: [27-back left, 28-back right, 30-front left, 26-front right] (from your config)
