@@ -203,24 +203,33 @@ class RemoteControl:
         """Collect robot data in background thread."""
         while self.running:
             try:
-                # Get robot position and heading
-                robot_heading = self.bot.imu.get_heading_rad()
-                tof_pairs = self.bot.tof.get_localization_pairs(fresh=False)
-                robot_x, robot_y, _ = self.bot.localization.estimate_position(robot_heading, tof_pairs)
+                # Get robot position and heading (handle missing components)
+                robot_heading = self.bot.imu.get_heading_rad() if self.bot.imu.is_available() else 0.0
+                
+                # Handle missing ToF and localization components
+                if hasattr(self.bot, 'tof') and hasattr(self.bot, 'localization'):
+                    tof_pairs = self.bot.tof.get_localization_pairs(fresh=False)
+                    robot_x, robot_y, _ = self.bot.localization.estimate_position(robot_heading, tof_pairs)
+                    
+                    # Get ToF readings
+                    tof_readings = []
+                    for angle, distance in tof_pairs:
+                        tof_readings.append({
+                            'angle': math.degrees(angle),
+                            'distance': distance
+                        })
+                    localization_error = self.bot.localization.best_error
+                else:
+                    # Default values when ToF/localization not available
+                    robot_x, robot_y = 0.0, 0.0
+                    tof_readings = []
+                    localization_error = 0.0
                 
                 # Get ball data
                 ball_detected = self.bot.camera.is_ball_detected()
                 ball_x, ball_y = self.bot.camera.get_ball_position()
                 ball_angle = self.bot.camera.get_ball_angle()
                 ball_distance = self.bot.camera.get_ball_distance_from_center()
-                
-                # Get ToF readings
-                tof_readings = []
-                for angle, distance in tof_pairs:
-                    tof_readings.append({
-                        'angle': math.degrees(angle),
-                        'distance': distance
-                    })
                 
                 # Update robot data
                 self.robot_data.update({
@@ -231,7 +240,7 @@ class RemoteControl:
                     'ball_angle': math.degrees(ball_angle) if ball_detected else 0.0,
                     'ball_distance': ball_distance if ball_detected else 0.0,
                     'tof_readings': tof_readings,
-                    'localization_error': self.bot.localization.best_error,
+                    'localization_error': localization_error,
                     'last_update': time.time()
                 })
                 
