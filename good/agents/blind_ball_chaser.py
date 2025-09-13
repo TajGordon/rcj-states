@@ -208,6 +208,17 @@ class Agent:
                 self.last_command_speed = speed
                 print(f"   ✅ Turn command sent successfully")
                 
+            elif command_type == 'set_speeds':
+                speeds = args[0]  # speeds is the first argument
+                print(f"   🎮 SETTING DIRECT MOTOR SPEEDS:")
+                print(f"      Speeds: {speeds}")
+                self.bot.motor_controller.set_motor_speeds(speeds)
+                self.current_movement_state = 'moving'
+                self.last_command_time = current_time
+                self.last_command_direction = 0.0  # Not applicable for direct speeds
+                self.last_command_speed = max(abs(speed) for speed in speeds) / 1000  # Approximate speed level
+                print(f"   ✅ Direct motor speeds set successfully")
+                
             self.consecutive_errors = 0  # Reset error count on successful command
             
         except Exception as e:
@@ -234,37 +245,125 @@ class Agent:
     
     
     def _chase_ball(self, ball_angle, ball_distance):
-        """Chase the ball based on angle and distance - simplified approach."""
+        """Chase the ball using soccer_bot coordinate system and motor calculation."""
+        # Get ball position from camera
+        ball_x, ball_y = self.bot.camera.get_ball_position()
+        
+        if ball_x is None or ball_y is None:
+            print(f"   ❌ No ball position available")
+            return
+        
         # DEBUG: Print ball detection info
         print(f"🎯 BALL DETECTED:")
+        print(f"   Ball position: ({ball_x}, {ball_y})")
         print(f"   Ball angle (rad): {ball_angle:.3f}")
         print(f"   Ball angle (deg): {math.degrees(ball_angle):.1f}°")
         print(f"   Ball distance: {ball_distance:.0f}px")
         
-        # Ball angle is already in radians from camera (0=forward, clockwise)
-        # Motor controller expects direction in radians (0=forward, π/2=right, π=back, 3π/2=left)
-        # So we can use ball_angle directly!
-        direction_rad = ball_angle
+        # Use soccer_bot coordinate system
+        frame_center_x = 320  # Camera center X
+        frame_center_y = 320  # Camera center Y
         
-        # Determine speed based on distance
+        # Calculate error from ball position to center of frame (soccer_bot method)
+        error_x = ball_x - frame_center_x
+        error_y = frame_center_y - ball_y  # Note: Y is inverted in image coordinates
+        
+        error_x_norm = error_x / frame_center_x
+        error_y_norm = error_y / frame_center_y
+        
+        print(f"   📐 COORDINATE SYSTEM:")
+        print(f"      Error X: {error_x}px (norm: {error_x_norm:.3f})")
+        print(f"      Error Y: {error_y}px (norm: {error_y_norm:.3f})")
+        print(f"      Direction: {'RIGHT' if error_x > 0 else 'LEFT' if error_x < 0 else 'CENTER'}")
+        
+        # Calculate motor speeds using soccer_bot method
+        speeds = self._calculate_motor_speeds_soccer_bot_style(error_x_norm, error_y_norm, ball_distance)
+        
+        # Apply motor speeds directly
+        self._safe_motor_command('set_speeds', speeds)
+    
+    def _calculate_motor_speeds_soccer_bot_style(self, error_x_norm, error_y_norm, ball_distance):
+        """Calculate motor speeds using soccer_bot method adapted for your hardware"""
+        # Use YOUR hardware max speed (not soccer_bot's)
+        max_speed = self.bot.motor_controller.max_speed  # 30,000,000 for your setup
+        
+        # Soccer bot control parameters (these work well, so keep them)
+        kp_turn = 2.0
+        kp_forward = 0.8
+        turn_threshold = 0.1
+        tight_turn_factor = 0.3
+        pure_turn_threshold = 0.4
+        nonlinear_turn_power = 0.5
+        
+        # Determine speed based on distance (adapted for your hardware)
+        # Your speed levels are 1.0-3.0, so scale them appropriately
         if ball_distance < self.close_distance:
-            speed_level = self.slow_speed_level
-            print(f"   📍 CLOSE to ball ({ball_distance:.0f}px) - SLOW chase at speed {speed_level}")
+            speed_multiplier = self.slow_speed_level / 4.0  # 1.0/4.0 = 0.25 (25% of max)
         elif ball_distance > self.far_distance:
-            speed_level = self.fast_speed_level
-            print(f"   📍 FAR from ball ({ball_distance:.0f}px) - FAST chase at speed {speed_level}")
+            speed_multiplier = self.fast_speed_level / 4.0  # 3.0/4.0 = 0.75 (75% of max)
         else:
-            speed_level = self.base_speed_level
-            print(f"   📍 MEDIUM distance to ball ({ball_distance:.0f}px) - NORMAL chase at speed {speed_level}")
+            speed_multiplier = self.base_speed_level / 4.0  # 2.0/4.0 = 0.5 (50% of max)
         
-        # DEBUG: Print movement command
-        print(f"   🚀 MOVEMENT COMMAND:")
-        print(f"      Direction: {direction_rad:.3f} rad ({math.degrees(direction_rad):.1f}°)")
-        print(f"      Speed: {speed_level}")
-        print(f"      Expected movement: {self._describe_direction(direction_rad)}")
+        # Apply speed multiplier to max_speed
+        effective_max_speed = max_speed * speed_multiplier
         
-        # Move towards ball using safe command (pass radians, not degrees!)
-        self._safe_motor_command('move_direction', direction_rad, speed_level)
+        print(f"   🎮 MOTOR CALCULATION:")
+        print(f"      Speed multiplier: {speed_multiplier:.2f}")
+        print(f"      Effective max speed: {effective_max_speed//1000}k")
+        
+        # Calculate turning adjustment based on horizontal ball position (soccer_bot method)
+        if abs(error_x_norm) < turn_threshold:
+            turn_adjustment = 0
+            is_turning = False
+            print(f"      Turn mode: STRAIGHT (error < {turn_threshold})")
+        else:
+            # Use nonlinear turning response
+            error_sign = 1 if error_x_norm > 0 else -1
+            error_magnitude = abs(error_x_norm)
+            nonlinear_error = error_sign * (error_magnitude ** nonlinear_turn_power)
+            turn_adjustment = nonlinear_error * effective_max_speed * kp_turn
+            is_turning = True
+            
+            if abs(error_x_norm) > pure_turn_threshold:
+                print(f"      Turn mode: PURE_TURN (error > {pure_turn_threshold})")
+            else:
+                print(f"      Turn mode: TIGHT_TURN")
+        
+        # Base forward movement speed
+        if is_turning:
+            if abs(error_x_norm) > pure_turn_threshold:
+                forward_speed = effective_max_speed * kp_forward * 0.1
+            else:
+                forward_speed = effective_max_speed * kp_forward * tight_turn_factor
+        else:
+            forward_speed = effective_max_speed * kp_forward
+        
+        print(f"      Forward speed: {forward_speed//1000}k")
+        print(f"      Turn adjustment: {turn_adjustment//1000}k")
+        
+        # Calculate individual motor speeds (soccer_bot method adapted for your hardware)
+        # Motors: [27-back left, 28-back right, 30-front left, 26-front right] (from your config)
+        # Front-left (30) and back-left (27) motors are inverted due to hardware orientation
+        
+        # Back-left motor (27): forward movement (INVERTED) + turn adjustment (inverted for left motor)
+        back_left_speed = -(forward_speed + turn_adjustment)
+        
+        # Back-right motor (28): forward movement - turn adjustment
+        back_right_speed = forward_speed - turn_adjustment
+        
+        # Front-left motor (30): forward movement (INVERTED) + turn adjustment (inverted for left motor)
+        front_left_speed = -(forward_speed + turn_adjustment)
+        
+        # Front-right motor (26): forward movement - turn adjustment
+        front_right_speed = forward_speed - turn_adjustment
+        
+        # Clip speeds to max limits
+        speeds = [back_left_speed, back_right_speed, front_left_speed, front_right_speed]
+        speeds = [int(max(-effective_max_speed, min(effective_max_speed, speed))) for speed in speeds]
+        
+        print(f"      Final speeds: BL:{speeds[0]//1000}k BR:{speeds[1]//1000}k FL:{speeds[2]//1000}k FR:{speeds[3]//1000}k")
+        
+        return speeds
     
     def _describe_direction(self, angle_rad):
         """Describe the direction in human-readable terms"""

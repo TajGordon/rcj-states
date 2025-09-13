@@ -43,7 +43,7 @@ class MotorController:
                 print(f"ERROR: Motor {i} firmware version {motor.get_firmware_version()} (expected 3)")
                 continue
                 
-            # Configure motor parameters with 4A current limit
+            # Configure motor parameters with 4A current limit (your hardware setup)
             motor.set_current_limit_foc(self.max_current)
             motor.set_id_pid_constants(1500, 200)
             motor.set_iq_pid_constants(1500, 200)
