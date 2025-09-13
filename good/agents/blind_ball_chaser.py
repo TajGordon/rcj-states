@@ -82,17 +82,17 @@ class Agent:
     def _chase_ball_cycle(self):
         """Single cycle of ball chasing logic - simplified to focus only on ball angle."""
         try:
-        # Get ball information
-        ball_detected = self.bot.camera.is_ball_detected()
-        
-        if ball_detected:
-            self.no_ball_count = 0
+            # Get ball information
+            ball_detected = self.bot.camera.is_ball_detected()
+            
+            if ball_detected:
+                self.no_ball_count = 0
                 self.consecutive_errors = 0  # Reset error count on successful detection
-            
-            # Get ball data
-            ball_angle = self.bot.camera.get_ball_angle()
-            ball_distance = self.bot.camera.get_ball_distance_from_center()
-            
+                
+                # Get ball data
+                ball_angle = self.bot.camera.get_ball_angle()
+                ball_distance = self.bot.camera.get_ball_distance_from_center()
+                
                 print(f"\n🔍 CHASE CYCLE - Ball detected!")
                 print(f"   Current state: {self.current_movement_state}")
                 print(f"   Last command time: {time.time() - self.last_command_time:.2f}s ago")
@@ -107,27 +107,27 @@ class Agent:
                 else:
                     print(f"   ⏸️  Movement skipped (micro-adjustment threshold not met)")
                 
-            # Store for reference
-            self.last_ball_angle = ball_angle
-            self.last_ball_distance = ball_distance
-        else:
-            # No ball detected
-            self.no_ball_count += 1
+                # Store for reference
+                self.last_ball_angle = ball_angle
+                self.last_ball_distance = ball_distance
+            else:
+                # No ball detected
+                self.no_ball_count += 1
                 print(f"\n❌ NO BALL DETECTED (count: {self.no_ball_count}/{self.max_no_ball_count})")
-            
-            if self.no_ball_count > self.max_no_ball_count:
-                # Stop if no ball for too long
+                
+                if self.no_ball_count > self.max_no_ball_count:
+                    # Stop if no ball for too long
                     self._safe_motor_command('stop')
                     print("   🛑 No ball detected for too long - stopping")
-            else:
-                # Use last known ball position or search
-                if self.last_ball_angle != 0.0:
-                        print(f"   🔄 Using last known angle: {math.degrees(self.last_ball_angle):.1f}°")
-                    self._chase_ball(self.last_ball_angle, self.last_ball_distance)
                 else:
-                    # Search by turning
+                    # Use last known ball position or search
+                    if self.last_ball_angle != 0.0:
+                        print(f"   🔄 Using last known angle: {math.degrees(self.last_ball_angle):.1f}°")
+                        self._chase_ball(self.last_ball_angle, self.last_ball_distance)
+                    else:
+                        # Search by turning
                         print(f"   🔍 Searching for ball...")
-                    self._search_for_ball()
+                        self._search_for_ball()
                         
         except Exception as e:
             print(f"❌ Error in chase ball cycle: {e}")
