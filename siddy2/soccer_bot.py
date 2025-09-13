@@ -31,6 +31,7 @@ class SoccerRobot:
         self.upper_orange = np.array([14,255,255]) #[14,255,255]
        
         # Define speed parameters before setup_motors() is called
+<<<<<<< HEAD
         self.max_speed = 90000000  # Maximum speed for all movements (increased from 50M to 80M)
         self.kp_turn = 1.4  # Turn sensitivity multiplier (increased from 1.2 to 1.5)
         self.kp_forward = 0.7  # Forward movement sensitivity multiplier (increased from 0.5 to 0.7)
@@ -38,6 +39,15 @@ class SoccerRobot:
         self.tight_turn_factor = 0.6  # Reduce forward speed during turns (increased from 0.2 to 0.4)
         self.pure_turn_threshold = 0.15  # Error threshold for pure turning in place (reduced from 0.2 to 0.15)
         self.nonlinear_turn_power = 0.9  # Power for nonlinear turning (increased from 0.5 to 0.7 for less aggressive near center)
+=======
+        self.max_speed = 120000000  # Maximum speed for all movements (increased from 80M to 120M)
+        self.kp_turn = 2.5  # Turn sensitivity multiplier (increased from 1.5 to 2.5 for more flicky movement)
+        self.kp_forward = 0.9  # Forward movement sensitivity multiplier (increased from 0.7 to 0.9)
+        self.turn_threshold = 0.02  # Minimum error to start turning (reduced from 0.05 to 0.02 for very flicky movement)
+        self.tight_turn_factor = 0.6  # Reduce forward speed during turns (increased from 0.4 to 0.6)
+        self.pure_turn_threshold = 0.1  # Error threshold for pure turning in place (reduced from 0.15 to 0.1)
+        self.nonlinear_turn_power = 0.4  # Power for nonlinear turning (reduced from 0.7 to 0.4 for more aggressive near center)
+>>>>>>> refs/remotes/origin/main
        
         self.i2c = busio.I2C(board.SCL, board.SDA)
         self.motors = []
