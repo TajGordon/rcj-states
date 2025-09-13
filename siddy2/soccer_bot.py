@@ -31,13 +31,13 @@ class SoccerRobot:
         self.upper_orange = np.array([14,255,255]) #[14,255,255]
        
         # Define speed parameters before setup_motors() is called
-        self.max_speed = 30000000  # Maximum speed for all movements (reduced from 150M to 30M)
-        self.kp_turn = 1  # Turn sensitivity multiplier (reduced from 2.0 to 0.5)
-        self.kp_forward = 0.3  # Forward movement sensitivity multiplier (reduced from 0.8 to 0.3)
-        self.turn_threshold = 0.1  # Minimum error to start turning (reduces jitter)
-        self.tight_turn_factor = 0.1  # Reduce forward speed during turns for tighter turning (reduced from 0.3)
-        self.pure_turn_threshold = 0.2  # Error threshold for pure turning in place (reduced from 0.4)
-        self.nonlinear_turn_power = 0.5  # Power for nonlinear turning (0.5 = square root, 1.0 = linear)
+        self.max_speed = 50000000  # Maximum speed for all movements (increased from 30M to 50M)
+        self.kp_turn = 1.2  # Turn sensitivity multiplier (increased from 1.0 to 1.2)
+        self.kp_forward = 0.5  # Forward movement sensitivity multiplier (increased from 0.3 to 0.5)
+        self.turn_threshold = 0.05  # Minimum error to start turning (reduced from 0.1 to 0.05 for more precision)
+        self.tight_turn_factor = 0.2  # Reduce forward speed during turns (increased from 0.1 to 0.2)
+        self.pure_turn_threshold = 0.15  # Error threshold for pure turning in place (reduced from 0.2 to 0.15)
+        self.nonlinear_turn_power = 0.7  # Power for nonlinear turning (increased from 0.5 to 0.7 for less aggressive near center)
        
         self.i2c = busio.I2C(board.SCL, board.SDA)
         self.motors = []
@@ -319,7 +319,7 @@ class SoccerRobot:
     def calculate_search_commands(self):
         """Calculate motor commands for searching when no ball is detected."""
         # Turn left to search for ball
-        turn_speed = self.max_speed * 0.1  # 10% of max speed for searching (reduced from 30%)
+        turn_speed = self.max_speed * 0.15  # 15% of max speed for searching (increased from 10%)
         
         # Left turn: left motors backward, right motors forward
         # Back-left motor (25): backward (INVERTED)
