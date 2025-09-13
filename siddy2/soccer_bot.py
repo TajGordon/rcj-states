@@ -31,12 +31,12 @@ class SoccerRobot:
         self.upper_orange = np.array([14,255,255]) #[14,255,255]
        
         # Define speed parameters before setup_motors() is called
-        self.max_speed = 150000000  # Maximum speed for all movements
-        self.kp_turn = 2.0  # Turn sensitivity multiplier (increased for tighter turns)
-        self.kp_forward = 0.8  # Forward movement sensitivity multiplier
+        self.max_speed = 30000000  # Maximum speed for all movements (reduced from 150M to 30M)
+        self.kp_turn = 0.5  # Turn sensitivity multiplier (reduced from 2.0 to 0.5)
+        self.kp_forward = 0.3  # Forward movement sensitivity multiplier (reduced from 0.8 to 0.3)
         self.turn_threshold = 0.1  # Minimum error to start turning (reduces jitter)
-        self.tight_turn_factor = 0.3  # Reduce forward speed during turns for tighter turning
-        self.pure_turn_threshold = 0.4  # Error threshold for pure turning in place (no forward movement)
+        self.tight_turn_factor = 0.1  # Reduce forward speed during turns for tighter turning (reduced from 0.3)
+        self.pure_turn_threshold = 0.2  # Error threshold for pure turning in place (reduced from 0.4)
         self.nonlinear_turn_power = 0.5  # Power for nonlinear turning (0.5 = square root, 1.0 = linear)
        
         self.i2c = busio.I2C(board.SCL, board.SDA)
@@ -60,8 +60,8 @@ class SoccerRobot:
        
        
     def setup_motors(self, force_calibration=False):
-        # 4 omniwheels: 27-back left, 28-back right, 30-front left, 26-front right
-        motor_addresses = [25, 26, 27, 29]
+        # 4 omniwheels: 25-back left, 29-back right, 26-front left, 27-front right (from config.py storm hostname)
+        motor_addresses = [25, 29, 26, 27]
        
         for i, addr in enumerate(motor_addresses):
             motor = PowerfulBLDCDriver(self.i2c, addr)
@@ -242,10 +242,10 @@ class SoccerRobot:
             error_x_norm = 0
             error_y_norm = 0
        
-        # OMNIWHEEL CONFIGURATION (matching omniwheel_test.py)
-        # Motors: [27-back left, 28-back right, 30-front left, 26-front right]
+        # OMNIWHEEL CONFIGURATION (matching config.py storm hostname)
+        # Motors: [25-back left, 29-back right, 26-front left, 27-front right]
         # IMPORTANT: In this setup:
-        # - Front-left (30) and back-left (27) motors are inverted due to hardware orientation
+        # - Front-left (26) and back-left (25) motors are inverted due to hardware orientation
         # - For turning: left motors slow down, right motors speed up (to turn right)
         # - For turning: right motors slow down, left motors speed up (to turn left)
 
@@ -283,20 +283,20 @@ class SoccerRobot:
         else:
             forward_speed = self.max_speed * self.kp_forward
 
-        # Calculate individual motor speeds with turning (matching omniwheel_test.py logic)
+        # Calculate individual motor speeds with turning (matching config.py storm hostname)
         # To turn right: slow down left motors, speed up right motors
         # To turn left: slow down right motors, speed up left motors
        
-        # Back-left motor (27): forward movement (INVERTED) + turn adjustment (inverted for left motor)
+        # Back-left motor (25): forward movement (INVERTED) + turn adjustment (inverted for left motor)
         back_left_speed = -(forward_speed + turn_adjustment)
 
-        # Back-right motor (28): forward movement - turn adjustment
+        # Back-right motor (29): forward movement - turn adjustment
         back_right_speed = forward_speed - turn_adjustment
 
-        # Front-left motor (30): forward movement (INVERTED) + turn adjustment (inverted for left motor)
+        # Front-left motor (26): forward movement (INVERTED) + turn adjustment (inverted for left motor)
         front_left_speed = -(forward_speed + turn_adjustment)
 
-        # Front-right motor (26): forward movement - turn adjustment
+        # Front-right motor (27): forward movement - turn adjustment
         front_right_speed = forward_speed - turn_adjustment
        
         # Clip speeds to max limits
@@ -306,7 +306,7 @@ class SoccerRobot:
         return [int(speed) for speed in speeds]
    
     def set_motor_speeds(self, speeds):
-        # speeds: [27-back left, 28-back right, 30-front left, 26-front right]
+        # speeds: [25-back left, 29-back right, 26-front left, 27-front right]
         if len(self.motors) >= 4 and len(speeds) >= 4:
             for i, speed in enumerate(speeds):
                 self.motors[i].set_speed(speed)
@@ -319,13 +319,13 @@ class SoccerRobot:
     def calculate_search_commands(self):
         """Calculate motor commands for searching when no ball is detected."""
         # Turn left to search for ball
-        turn_speed = self.max_speed * 0.3  # 30% of max speed for searching
+        turn_speed = self.max_speed * 0.1  # 10% of max speed for searching (reduced from 30%)
         
         # Left turn: left motors backward, right motors forward
-        # Back-left motor (27): backward (INVERTED)
-        # Back-right motor (28): forward
-        # Front-left motor (30): backward (INVERTED)  
-        # Front-right motor (26): forward
+        # Back-left motor (25): backward (INVERTED)
+        # Back-right motor (29): forward
+        # Front-left motor (26): backward (INVERTED)  
+        # Front-right motor (27): forward
         speeds = [-turn_speed, turn_speed, -turn_speed, turn_speed]
         
         return [int(speed) for speed in speeds]
