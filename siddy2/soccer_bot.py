@@ -32,7 +32,7 @@ class SoccerRobot:
        
         # Define speed parameters before setup_motors() is called
         self.max_speed = 30000000  # Maximum speed for all movements (reduced from 150M to 30M)
-        self.kp_turn = 0.5  # Turn sensitivity multiplier (reduced from 2.0 to 0.5)
+        self.kp_turn = 1.5  # Turn sensitivity multiplier (increased from 0.5 to 1.5)
         self.kp_forward = 0.3  # Forward movement sensitivity multiplier (reduced from 0.8 to 0.3)
         self.turn_threshold = 0.1  # Minimum error to start turning (reduces jitter)
         self.tight_turn_factor = 0.1  # Reduce forward speed during turns for tighter turning (reduced from 0.3)
@@ -319,7 +319,7 @@ class SoccerRobot:
     def calculate_search_commands(self):
         """Calculate motor commands for searching when no ball is detected."""
         # Turn left to search for ball
-        turn_speed = self.max_speed * 0.1  # 10% of max speed for searching (reduced from 30%)
+        turn_speed = self.max_speed * 0.2  # 20% of max speed for searching (increased from 10%)
         
         # Left turn: left motors backward, right motors forward
         # Back-left motor (25): backward (INVERTED)
