@@ -82,17 +82,17 @@ class Agent:
     def _chase_ball_cycle(self):
         """Single cycle of ball chasing logic - simplified to focus only on ball angle."""
         try:
-            # Get ball information
-            ball_detected = self.bot.camera.is_ball_detected()
-            
-            if ball_detected:
-                self.no_ball_count = 0
+        # Get ball information
+        ball_detected = self.bot.camera.is_ball_detected()
+        
+        if ball_detected:
+            self.no_ball_count = 0
                 self.consecutive_errors = 0  # Reset error count on successful detection
-                
-                # Get ball data
-                ball_angle = self.bot.camera.get_ball_angle()
-                ball_distance = self.bot.camera.get_ball_distance_from_center()
-                
+            
+            # Get ball data
+            ball_angle = self.bot.camera.get_ball_angle()
+            ball_distance = self.bot.camera.get_ball_distance_from_center()
+            
                 print(f"\n🔍 CHASE CYCLE - Ball detected!")
                 print(f"   Current state: {self.current_movement_state}")
                 print(f"   Last command time: {time.time() - self.last_command_time:.2f}s ago")
@@ -107,27 +107,27 @@ class Agent:
                 else:
                     print(f"   ⏸️  Movement skipped (micro-adjustment threshold not met)")
                 
-                # Store for reference
-                self.last_ball_angle = ball_angle
-                self.last_ball_distance = ball_distance
-            else:
-                # No ball detected
-                self.no_ball_count += 1
+            # Store for reference
+            self.last_ball_angle = ball_angle
+            self.last_ball_distance = ball_distance
+        else:
+            # No ball detected
+            self.no_ball_count += 1
                 print(f"\n❌ NO BALL DETECTED (count: {self.no_ball_count}/{self.max_no_ball_count})")
-                
-                if self.no_ball_count > self.max_no_ball_count:
-                    # Stop if no ball for too long
+            
+            if self.no_ball_count > self.max_no_ball_count:
+                # Stop if no ball for too long
                     self._safe_motor_command('stop')
                     print("   🛑 No ball detected for too long - stopping")
-                else:
-                    # Use last known ball position or search
-                    if self.last_ball_angle != 0.0:
+            else:
+                # Use last known ball position or search
+                if self.last_ball_angle != 0.0:
                         print(f"   🔄 Using last known angle: {math.degrees(self.last_ball_angle):.1f}°")
-                        self._chase_ball(self.last_ball_angle, self.last_ball_distance)
-                    else:
-                        # Search by turning
+                    self._chase_ball(self.last_ball_angle, self.last_ball_distance)
+                else:
+                    # Search by turning
                         print(f"   🔍 Searching for ball...")
-                        self._search_for_ball()
+                    self._search_for_ball()
                         
         except Exception as e:
             print(f"❌ Error in chase ball cycle: {e}")
@@ -208,6 +208,21 @@ class Agent:
                 self.last_command_speed = speed
                 print(f"   ✅ Turn command sent successfully")
                 
+            elif command_type == 'rotate':
+                speed, direction = args
+                print(f"   🔄 ROTATING: {direction} at speed {speed}")
+                if direction == 'right':
+                    # Rotate right (clockwise) - left motors forward, right motors backward
+                    self.bot.motor_controller.turn_in_place('right', speed)
+                else:  # left
+                    # Rotate left (counter-clockwise) - right motors forward, left motors backward
+                    self.bot.motor_controller.turn_in_place('left', speed)
+                self.current_movement_state = 'turning'
+                self.last_command_time = current_time
+                self.last_command_direction = direction
+                self.last_command_speed = speed
+                print(f"   ✅ Rotate command sent successfully")
+                
             elif command_type == 'set_speeds':
                 speeds = args[0]  # speeds is the first argument
                 print(f"   🎮 SETTING DIRECT MOTOR SPEEDS:")
@@ -278,11 +293,46 @@ class Agent:
         print(f"      Ball position: ({ball_x}, {ball_y})")
         print(f"      Frame center: ({frame_center_x}, {frame_center_y})")
         
-        # Calculate motor speeds using soccer_bot method
-        speeds = self._calculate_motor_speeds_soccer_bot_style(error_x_norm, error_y_norm, ball_distance)
+        # Simple logic: rotate to face ball, then move forward
+        angle_threshold = 0.05  # ~3 degrees - close enough to consider "facing" the ball
         
-        # Apply motor speeds directly
-        self._safe_motor_command('set_speeds', speeds)
+        if abs(error_x_norm) > angle_threshold:
+            # Need to rotate to face the ball
+            print(f"   🔄 ROTATING TO FACE BALL")
+            self._rotate_to_face_ball(error_x_norm, ball_distance)
+        else:
+            # Facing the ball, move forward
+            print(f"   ➡️  MOVING FORWARD TOWARD BALL")
+            self._move_forward_toward_ball(ball_distance)
+    
+    def _rotate_to_face_ball(self, error_x_norm, ball_distance):
+        """Rotate the robot to face the ball directly."""
+        # Determine rotation direction and speed
+        if error_x_norm > 0:
+            # Ball is to the right, rotate right (clockwise)
+            rotation_speed = min(0.3, abs(error_x_norm) * 2.0)  # Scale rotation speed
+            print(f"      Rotating RIGHT (clockwise) at speed {rotation_speed:.2f}")
+            self._safe_motor_command('rotate', rotation_speed, 'right')
+        else:
+            # Ball is to the left, rotate left (counter-clockwise)
+            rotation_speed = min(0.3, abs(error_x_norm) * 2.0)  # Scale rotation speed
+            print(f"      Rotating LEFT (counter-clockwise) at speed {rotation_speed:.2f}")
+            self._safe_motor_command('rotate', rotation_speed, 'left')
+    
+    def _move_forward_toward_ball(self, ball_distance):
+        """Move the robot forward toward the ball."""
+        # Determine forward speed based on distance
+        if ball_distance < self.close_distance:
+            forward_speed = self.slow_speed_level
+            print(f"      Moving SLOW forward (close to ball) at speed {forward_speed:.2f}")
+        elif ball_distance > self.far_distance:
+            forward_speed = self.fast_speed_level
+            print(f"      Moving FAST forward (far from ball) at speed {forward_speed:.2f}")
+        else:
+            forward_speed = self.base_speed_level
+            print(f"      Moving forward at speed {forward_speed:.2f}")
+        
+        self._safe_motor_command('move_direction', 0.0, forward_speed)  # 0.0 = straight forward
     
     def _calculate_motor_speeds_soccer_bot_style(self, error_x_norm, error_y_norm, ball_distance):
         """Calculate motor speeds using soccer_bot method adapted for your hardware"""
