@@ -31,23 +31,20 @@ class SoccerRobot:
         self.upper_orange = np.array([14,255,255]) #[14,255,255]
        
         # Define speed parameters before setup_motors() is called
-<<<<<<< HEAD
-        self.max_speed = 90000000  # Maximum speed for all movements (increased from 50M to 80M)
-        self.kp_turn = 1.4  # Turn sensitivity multiplier (increased from 1.2 to 1.5)
-        self.kp_forward = 0.7  # Forward movement sensitivity multiplier (increased from 0.5 to 0.7)
-        self.turn_threshold = 0.03  # Minimum error to start turning (reduced from 0.1 to 0.05 for more precision)
-        self.tight_turn_factor = 0.6  # Reduce forward speed during turns (increased from 0.2 to 0.4)
-        self.pure_turn_threshold = 0.15  # Error threshold for pure turning in place (reduced from 0.2 to 0.15)
-        self.nonlinear_turn_power = 0.9  # Power for nonlinear turning (increased from 0.5 to 0.7 for less aggressive near center)
-=======
-        self.max_speed = 120000000  # Maximum speed for all movements (increased from 80M to 120M)
-        self.kp_turn = 2.5  # Turn sensitivity multiplier (increased from 1.5 to 2.5 for more flicky movement)
-        self.kp_forward = 0.9  # Forward movement sensitivity multiplier (increased from 0.7 to 0.9)
-        self.turn_threshold = 0.02  # Minimum error to start turning (reduced from 0.05 to 0.02 for very flicky movement)
-        self.tight_turn_factor = 0.6  # Reduce forward speed during turns (increased from 0.4 to 0.6)
-        self.pure_turn_threshold = 0.1  # Error threshold for pure turning in place (reduced from 0.15 to 0.1)
-        self.nonlinear_turn_power = 0.4  # Power for nonlinear turning (reduced from 0.7 to 0.4 for more aggressive near center)
->>>>>>> refs/remotes/origin/main
+        self.max_speed = 150000000  # Maximum speed for all movements (increased from 120M to 150M)
+        self.kp_turn = 3.0  # Turn sensitivity multiplier (increased from 2.5 to 3.0 for ultra-responsive)
+        self.kp_forward = 1.0  # Forward movement sensitivity multiplier (increased from 0.9 to 1.0 for max speed)
+        self.turn_threshold = 0.01  # Minimum error to start turning (reduced from 0.02 to 0.01 for ultra-precise)
+        self.tight_turn_factor = 0.3  # Reduce forward speed during turns (reduced from 0.6 to 0.3 for better turning)
+        self.pure_turn_threshold = 0.08  # Error threshold for pure turning in place (reduced from 0.1 to 0.08)
+        self.nonlinear_turn_power = 0.3  # Power for nonlinear turning (reduced from 0.4 to 0.3 for more aggressive near center)
+        
+        # Funky nonlinear response parameters
+        self.turn_acceleration_factor = 1.5  # How quickly turning ramps up
+        self.turn_deceleration_factor = 0.8  # How quickly turning ramps down
+        self.dynamic_turn_scaling = True  # Enable dynamic turn scaling based on ball distance
+        self.min_turn_speed = 0.1  # Minimum turn speed as fraction of max
+        self.max_turn_speed = 0.9  # Maximum turn speed as fraction of max
        
         self.i2c = busio.I2C(board.SCL, board.SDA)
         self.motors = []
@@ -259,7 +256,7 @@ class SoccerRobot:
         # - For turning: left motors slow down, right motors speed up (to turn right)
         # - For turning: right motors slow down, left motors speed up (to turn left)
 
-        # Calculate turning adjustment based on horizontal ball position
+        # Calculate turning adjustment with funky nonlinear response
         # Apply turn threshold to reduce jitter and unnecessary small adjustments
         if abs(error_x_norm) < self.turn_threshold:
             turn_adjustment = 0
@@ -268,29 +265,44 @@ class SoccerRobot:
             # Positive error_x_norm means ball is to the right, so turn right
             # Negative error_x_norm means ball is to the left, so turn left
            
-            # Use nonlinear turning response to reduce over-turning when ball is close to center
-            # Apply a square root function to reduce sensitivity for small errors
             error_sign = 1 if error_x_norm > 0 else -1
             error_magnitude = abs(error_x_norm)
            
-            # Nonlinear scaling: error^power for gentler response near center
-            # This reduces over-turning when ball is close to center
-            # 0.5 = square root (gentle), 1.0 = linear (aggressive)
-            nonlinear_error = error_sign * (error_magnitude ** self.nonlinear_turn_power)
+            # Funky nonlinear response with multiple curves
+            # Use a combination of power curves for more dynamic response
+            if error_magnitude < 0.3:
+                # Gentle response for small errors (ball near center)
+                nonlinear_error = error_sign * (error_magnitude ** self.nonlinear_turn_power)
+            else:
+                # More aggressive response for larger errors
+                nonlinear_error = error_sign * (error_magnitude ** 0.8)
            
-            turn_adjustment = nonlinear_error * self.max_speed * self.kp_turn
+            # Dynamic turn scaling based on ball distance
+            if self.dynamic_turn_scaling and self.ball_detected:
+                # Calculate ball distance (approximate from radius)
+                ball_distance_factor = min(1.0, max(0.3, self.ball_radius / 50.0))
+                turn_scale = self.min_turn_speed + (self.max_turn_speed - self.min_turn_speed) * ball_distance_factor
+            else:
+                turn_scale = 1.0
+           
+            # Apply acceleration/deceleration factors for smoother response
+            base_turn = nonlinear_error * self.max_speed * self.kp_turn * turn_scale
+            turn_adjustment = base_turn * self.turn_acceleration_factor
             is_turning = True
 
-        # Base forward movement speed (based on max_speed)
+        # Dynamic forward movement speed with smart turning behavior
         # Reduce forward speed during turns for tighter turning radius
         if is_turning:
             if abs(error_x_norm) > self.pure_turn_threshold:
                 # Pure turning in place for large errors (minimal forward movement)
-                forward_speed = self.max_speed * self.kp_forward * 0.1
+                forward_speed = self.max_speed * self.kp_forward * 0.05  # Even slower for pure turns
             else:
-                # Reduced forward speed for moderate turns
-                forward_speed = self.max_speed * self.kp_forward * self.tight_turn_factor
+                # Dynamic forward speed based on turn intensity
+                turn_intensity = abs(error_x_norm) / self.pure_turn_threshold
+                forward_reduction = self.tight_turn_factor * (1.0 - turn_intensity * 0.5)
+                forward_speed = self.max_speed * self.kp_forward * forward_reduction
         else:
+            # Full forward speed when not turning
             forward_speed = self.max_speed * self.kp_forward
 
         # Calculate individual motor speeds with turning (matching config.py storm hostname)
@@ -329,7 +341,7 @@ class SoccerRobot:
     def calculate_search_commands(self):
         """Calculate motor commands for searching when no ball is detected."""
         # Turn left to search for ball
-        turn_speed = self.max_speed * 0.3  # 30% of max speed for searching (increased from 15%)
+        turn_speed = self.max_speed * 0.4  # 40% of max speed for searching (increased from 30%)
         
         # Left turn: left motors backward, right motors forward
         # Back-left motor (25): backward (INVERTED)
