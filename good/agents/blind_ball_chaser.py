@@ -82,17 +82,17 @@ class Agent:
     def _chase_ball_cycle(self):
         """Single cycle of ball chasing logic - simplified to focus only on ball angle."""
         try:
-            # Get ball information
-            ball_detected = self.bot.camera.is_ball_detected()
-            
-            if ball_detected:
-                self.no_ball_count = 0
+        # Get ball information
+        ball_detected = self.bot.camera.is_ball_detected()
+        
+        if ball_detected:
+            self.no_ball_count = 0
                 self.consecutive_errors = 0  # Reset error count on successful detection
             
-                # Get ball data
-                ball_angle = self.bot.camera.get_ball_angle()
-                ball_distance = self.bot.camera.get_ball_distance_from_center()
-                
+            # Get ball data
+            ball_angle = self.bot.camera.get_ball_angle()
+            ball_distance = self.bot.camera.get_ball_distance_from_center()
+            
                 print(f"\n🔍 CHASE CYCLE - Ball detected!")
                 print(f"   Current state: {self.current_movement_state}")
                 print(f"   Last command time: {time.time() - self.last_command_time:.2f}s ago")
@@ -107,27 +107,27 @@ class Agent:
                 else:
                     print(f"   ⏸️  Movement skipped (micro-adjustment threshold not met)")
                 
-                # Store for reference
-                self.last_ball_angle = ball_angle
-                self.last_ball_distance = ball_distance
-            else:
-                # No ball detected
-                self.no_ball_count += 1
+            # Store for reference
+            self.last_ball_angle = ball_angle
+            self.last_ball_distance = ball_distance
+        else:
+            # No ball detected
+            self.no_ball_count += 1
                 print(f"\n❌ NO BALL DETECTED (count: {self.no_ball_count}/{self.max_no_ball_count})")
             
-                if self.no_ball_count > self.max_no_ball_count:
-                    # Stop if no ball for too long
+            if self.no_ball_count > self.max_no_ball_count:
+                # Stop if no ball for too long
                     self._safe_motor_command('stop')
                     print("   🛑 No ball detected for too long - stopping")
-                else:
-                    # Use last known ball position or search
-                    if self.last_ball_angle != 0.0:
+            else:
+                # Use last known ball position or search
+                if self.last_ball_angle != 0.0:
                         print(f"   🔄 Using last known angle: {math.degrees(self.last_ball_angle):.1f}°")
-                        self._chase_ball(self.last_ball_angle, self.last_ball_distance)
-                    else:
-                        # Search by turning
+                    self._chase_ball(self.last_ball_angle, self.last_ball_distance)
+                else:
+                    # Search by turning
                         print(f"   🔍 Searching for ball...")
-                        self._search_for_ball()
+                    self._search_for_ball()
                         
         except Exception as e:
             print(f"❌ Error in chase ball cycle: {e}")
@@ -149,26 +149,14 @@ class Agent:
             print(f"      ❌ Too soon since last command")
             return False
         
-        # Check if angle change is significant enough
-        angle_change = abs(ball_angle - self.last_command_direction)
-        angle_change_deg = math.degrees(angle_change)
-        print(f"      Angle change: {angle_change_deg:.1f}° (min: {math.degrees(self.min_angle_change):.1f}°)")
-        if angle_change < self.min_angle_change:
-            print(f"      ❌ Angle change too small")
-            return False
-        
-        # Check if distance change is significant enough
-        distance_change = abs(ball_distance - self.last_ball_distance)
-        print(f"      Distance change: {distance_change:.0f}px (min: {self.min_distance_change}px)")
-        if distance_change < self.min_distance_change:
-            print(f"      ❌ Distance change too small")
-            return False
-        
-        print(f"      ✅ All thresholds met - movement allowed")
+        # For the new rotate-then-forward logic, we don't need complex angle/distance checks
+        # Just check if enough time has passed since last command
+        print(f"      ✅ Time threshold met - movement allowed")
         return True
     
     def _safe_motor_command(self, command_type, *args):
         """Safely execute motor commands with error handling."""
+        print(f"   🔧 _safe_motor_command called: {command_type} with args {args}")
         try:
             current_time = time.time()
             
@@ -312,11 +300,13 @@ class Agent:
             # Ball is to the right, rotate right (clockwise)
             rotation_speed = min(0.3, abs(error_x_norm) * 2.0)  # Scale rotation speed
             print(f"      Rotating RIGHT (clockwise) at speed {rotation_speed:.2f}")
+            print(f"      DEBUG: About to call _safe_motor_command('rotate', {rotation_speed}, 'right')")
             self._safe_motor_command('rotate', rotation_speed, 'right')
         else:
             # Ball is to the left, rotate left (counter-clockwise)
             rotation_speed = min(0.3, abs(error_x_norm) * 2.0)  # Scale rotation speed
             print(f"      Rotating LEFT (counter-clockwise) at speed {rotation_speed:.2f}")
+            print(f"      DEBUG: About to call _safe_motor_command('rotate', {rotation_speed}, 'left')")
             self._safe_motor_command('rotate', rotation_speed, 'left')
     
     def _move_forward_toward_ball(self, ball_distance):
@@ -332,6 +322,7 @@ class Agent:
             forward_speed = self.base_speed_level
             print(f"      Moving forward at speed {forward_speed:.2f}")
         
+        print(f"      DEBUG: About to call _safe_motor_command('move_direction', 0.0, {forward_speed})")
         self._safe_motor_command('move_direction', 0.0, forward_speed)  # 0.0 = straight forward
     
     def _calculate_motor_speeds_soccer_bot_style(self, error_x_norm, error_y_norm, ball_distance):
