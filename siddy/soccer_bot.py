@@ -33,9 +33,9 @@ class SoccerRobot:
        
         # Define speed parameters before setup_motors() is called
         self.max_speed = 150000000  # Maximum speed for all movements
-        self.kp_turn = 2.0  # Turn sensitivity multiplier (increased for tighter turns)
-        self.kp_forward = 0.8  # Forward movement sensitivity multiplier
-        self.turn_threshold = 0.1  # Minimum error to start turning (reduces jitter)
+        self.kp_turn = 3.0  # Turn sensitivity multiplier (increased for tighter turns)
+        self.kp_forward = 1.2  # Forward movement sensitivity multiplier
+        self.turn_threshold = 0.5  # Minimum error to start turning (reduces jitter)
         self.tight_turn_factor = 0.3  # Reduce forward speed during turns for tighter turning
         self.pure_turn_threshold = 0.4  # Error threshold for pure turning in place (no forward movement)
         self.nonlinear_turn_power = 0.5  # Power for nonlinear turning (0.5 = square root, 1.0 = linear)
