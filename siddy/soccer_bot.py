@@ -72,7 +72,7 @@ class SoccerRobot:
        
     def setup_motors(self, force_calibration=False):
         # 4 omniwheels: 27-back left, 28-back right, 30-front left, 26-front right
-        motor_addresses = [27, 28, 30, 26]
+        motor_addresses = [25, 29, 26, 27]
        
         for i, addr in enumerate(motor_addresses):
             motor = PowerfulBLDCDriver(self.i2c, addr)

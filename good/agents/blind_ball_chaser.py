@@ -26,7 +26,7 @@ class Agent:
         self.last_ball_angle = 0.0
         self.last_ball_distance = 0.0
         self.no_ball_count = 0
-        self.max_no_ball_count = 10  # Stop after 10 cycles without ball
+        self.max_no_ball_count = 50  # Stop after 50 cycles without ball (increased for more persistence)
         
         # Movement state tracking to reduce command frequency
         self.current_movement_state = 'stopped'  # 'stopped', 'moving', 'turning'
@@ -120,14 +120,9 @@ class Agent:
                     self._safe_motor_command('stop')
                     print("   🛑 No ball detected for too long - stopping")
                 else:
-                    # Use last known ball position or search
-                    if self.last_ball_angle != 0.0:
-                        print(f"   🔄 Using last known angle: {math.degrees(self.last_ball_angle):.1f}°")
-                        self._chase_ball(self.last_ball_angle, self.last_ball_distance)
-                    else:
-                        # Search by turning
-                        print(f"   🔍 Searching for ball...")
-                        self._search_for_ball()
+                    # Aggressively search for ball - always turn fast
+                    print(f"   🔍 AGGRESSIVE SEARCH - Turning fast to find ball...")
+                    self._aggressive_search_for_ball()
                         
         except Exception as e:
             print(f"❌ Error in chase ball cycle: {e}")
@@ -282,7 +277,7 @@ class Agent:
         print(f"      Frame center: ({frame_center_x}, {frame_center_y})")
         
         # Simple logic: rotate to face ball, then move forward
-        angle_threshold = 0.05  # ~3 degrees - close enough to consider "facing" the ball
+        angle_threshold = 0.02  # ~1 degree - very precise facing (reduced for more aggressive turning)
         
         if abs(error_x_norm) > angle_threshold:
             # Need to rotate to face the ball
@@ -295,17 +290,17 @@ class Agent:
     
     def _rotate_to_face_ball(self, error_x_norm, ball_distance):
         """Rotate the robot to face the ball directly."""
-        # Determine rotation direction and speed
+        # Determine rotation direction and speed - VERY AGGRESSIVE
         if error_x_norm > 0:
-            # Ball is to the right, rotate right (clockwise)
-            rotation_speed = min(0.8, abs(error_x_norm) * 4.0)  # Increased rotation speed
-            print(f"      Rotating RIGHT (clockwise) at speed {rotation_speed:.2f}")
+            # Ball is to the right, rotate right (clockwise) - FAST
+            rotation_speed = 1.0  # Maximum rotation speed for aggressive turning
+            print(f"      AGGRESSIVE ROTATING RIGHT (clockwise) at speed {rotation_speed:.2f}")
             print(f"      DEBUG: About to call _safe_motor_command('rotate', {rotation_speed}, 'right')")
             self._safe_motor_command('rotate', rotation_speed, 'right')
         else:
-            # Ball is to the left, rotate left (counter-clockwise)
-            rotation_speed = min(0.8, abs(error_x_norm) * 4.0)  # Increased rotation speed
-            print(f"      Rotating LEFT (counter-clockwise) at speed {rotation_speed:.2f}")
+            # Ball is to the left, rotate left (counter-clockwise) - FAST
+            rotation_speed = 1.0  # Maximum rotation speed for aggressive turning
+            print(f"      AGGRESSIVE ROTATING LEFT (counter-clockwise) at speed {rotation_speed:.2f}")
             print(f"      DEBUG: About to call _safe_motor_command('rotate', {rotation_speed}, 'left')")
             self._safe_motor_command('rotate', rotation_speed, 'left')
     
@@ -435,6 +430,18 @@ class Agent:
             return "LEFT"
         else:
             return "FORWARD-LEFT"
+    
+    def _aggressive_search_for_ball(self):
+        """Aggressively search for ball by turning fast."""
+        # Alternate between left and right turns for faster search
+        if self.no_ball_count % 4 < 2:
+            # Turn left fast
+            print(f"   🔄 AGGRESSIVE SEARCH - Turning LEFT fast (count: {self.no_ball_count})")
+            self._safe_motor_command('turn_in_place', 'left', 0.8)  # Fast turn
+        else:
+            # Turn right fast
+            print(f"   🔄 AGGRESSIVE SEARCH - Turning RIGHT fast (count: {self.no_ball_count})")
+            self._safe_motor_command('turn_in_place', 'right', 0.8)  # Fast turn
     
     def _search_for_ball(self):
         """Search for ball by turning when no ball is detected."""

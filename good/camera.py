@@ -56,8 +56,13 @@ def camera_process(ball_position, ball_radius, ball_angle, ball_detected, stop_e
                 mask = cv2.inRange(hsv, lower_orange, upper_orange)
                 contours, _ = cv2.findContours(mask, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
                 
+                # Debug: Print detection info
+                total_pixels = np.sum(mask > 0)
+                print(f"🔍 CAMERA DEBUG: Found {len(contours)} contours, {total_pixels} orange pixels")
+                
                 # Filter contours by area - reduced minimum area to detect smaller balls (radius ~7 or smaller)
                 filtered_contours = [x for x in contours if cv2.contourArea(x) > 20 and cv2.contourArea(x) < 30000]
+                print(f"🔍 CAMERA DEBUG: {len(filtered_contours)} contours after area filtering")
                 
                 if filtered_contours:
                     largest_contour = max(filtered_contours, key=cv2.contourArea)
