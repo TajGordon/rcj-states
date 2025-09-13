@@ -70,7 +70,7 @@ class SoccerRobot:
                 print(f"error: motor {i} firmware version {motor.get_firmware_version()}")
                 continue
                
-            motor.set_current_limit_foc(65536)
+            motor.set_current_limit_foc(4*65536)
             motor.set_id_pid_constants(1500, 200)
             motor.set_iq_pid_constants(1500, 200)
             motor.set_speed_pid_constants(4e-2, 4e-4, 3e-2)
@@ -242,13 +242,13 @@ class SoccerRobot:
             error_x_norm = 0
             error_y_norm = 0
        
-        # CUSTOM OMNIWHEEL CONFIGURATION
+        # OMNIWHEEL CONFIGURATION (matching omniwheel_test.py)
         # Motors: [27-back left, 28-back right, 30-front left, 26-front right]
         # IMPORTANT: In this setup:
         # - Front-left (30) and back-left (27) motors are inverted due to hardware orientation
         # - For turning: left motors slow down, right motors speed up (to turn right)
         # - For turning: right motors slow down, left motors speed up (to turn left)
- 
+
         # Calculate turning adjustment based on horizontal ball position
         # Apply turn threshold to reduce jitter and unnecessary small adjustments
         if abs(error_x_norm) < self.turn_threshold:
@@ -270,7 +270,7 @@ class SoccerRobot:
            
             turn_adjustment = nonlinear_error * self.max_speed * self.kp_turn
             is_turning = True
- 
+
         # Base forward movement speed (based on max_speed)
         # Reduce forward speed during turns for tighter turning radius
         if is_turning:
@@ -282,20 +282,20 @@ class SoccerRobot:
                 forward_speed = self.max_speed * self.kp_forward * self.tight_turn_factor
         else:
             forward_speed = self.max_speed * self.kp_forward
- 
-        # Calculate individual motor speeds with turning
+
+        # Calculate individual motor speeds with turning (matching omniwheel_test.py logic)
         # To turn right: slow down left motors, speed up right motors
         # To turn left: slow down right motors, speed up left motors
        
         # Back-left motor (27): forward movement (INVERTED) + turn adjustment (inverted for left motor)
         back_left_speed = -(forward_speed + turn_adjustment)
- 
+
         # Back-right motor (28): forward movement - turn adjustment
         back_right_speed = forward_speed - turn_adjustment
- 
+
         # Front-left motor (30): forward movement (INVERTED) + turn adjustment (inverted for left motor)
         front_left_speed = -(forward_speed + turn_adjustment)
- 
+
         # Front-right motor (26): forward movement - turn adjustment
         front_right_speed = forward_speed - turn_adjustment
        
@@ -310,6 +310,25 @@ class SoccerRobot:
         if len(self.motors) >= 4 and len(speeds) >= 4:
             for i, speed in enumerate(speeds):
                 self.motors[i].set_speed(speed)
+    
+    def update_motor_data(self):
+        """Update motor data readout (matching omniwheel_test.py)"""
+        for motor in self.motors:
+            motor.update_quick_data_readout()
+    
+    def calculate_search_commands(self):
+        """Calculate motor commands for searching when no ball is detected."""
+        # Turn left to search for ball
+        turn_speed = self.max_speed * 0.3  # 30% of max speed for searching
+        
+        # Left turn: left motors backward, right motors forward
+        # Back-left motor (27): backward (INVERTED)
+        # Back-right motor (28): forward
+        # Front-left motor (30): backward (INVERTED)  
+        # Front-right motor (26): forward
+        speeds = [-turn_speed, turn_speed, -turn_speed, turn_speed]
+        
+        return [int(speed) for speed in speeds]
    
     def stop_motors(self):
         for motor in self.motors:
@@ -371,16 +390,17 @@ class SoccerRobot:
                     close_prefix = "CLOSE+CENTERED - " if is_close_and_centered else "CLOSE - " if is_close else ""
                     print(f"{close_prefix}Ball at ({ball_center[0]}, {ball_center[1]}) - Area: {ball_area:.1f}px² - H_Error: {horizontal_error:.3f} V_Error: {vertical_error:.3f} - {turn_mode} - Turn: {turn_adjustment//1000}k - Speeds: BL:{speeds[0]//1000}k BR:{speeds[1]//1000}k FL:{speeds[2]//1000}k FR:{speeds[3]//1000}k - {heading_str} ({relative_str})")
                 else:
-                    # Stop motors when ball is not detected
-                    self.stop_motors()
-                   
+                    # Search for ball by turning when not found
+                    search_speeds = self.calculate_search_commands()
+                    self.set_motor_speeds(search_speeds)
+                    
                     # Get compass heading for display even when ball not found
                     heading = self.get_compass_heading()
                     relative_heading = self.get_relative_heading()
                     heading_str = f"Heading: {heading:.1f}°" if heading is not None else "Heading: N/A"
                     relative_str = f"Rel: {relative_heading:.1f}°" if relative_heading is not None else "Rel: N/A"
-                   
-                    print(f"Ball not found - motors stopped - {heading_str} ({relative_str})")
+                    
+                    print(f"Ball not found - searching by turning - {heading_str} ({relative_str})")
                
                 for motor in self.motors:
                     motor.update_quick_data_readout()

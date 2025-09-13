@@ -1,6 +1,6 @@
 import cv2
 import numpy as np
-from flask import Flask, render_template, Response
+from flask import Flask, render_template, Response, jsonify
 from picamera2 import Picamera2
 import threading
 import time
@@ -21,6 +21,16 @@ class CameraWebServer:
         # Frame processing
         self.frame = None
         self.frame_lock = threading.Lock()
+        
+        # Detection state
+        self.ball_detected = False
+        self.ball_center = None
+        self.ball_radius = 0
+        self.ball_area = 0
+        self.orange_pixels = 0
+        self.total_contours = 0
+        self.filtered_contours = 0
+        self.last_detection_time = 0
        
         # Start frame capture thread
         self.capture_thread = threading.Thread(target=self._capture_frames)
@@ -60,9 +70,17 @@ class CameraWebServer:
         mask = cv2.inRange(hsv_frame, self.lower_orange, self.upper_orange)
         contours, _ = cv2.findContours(mask, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
        
+        # Debug: Print contour information
+        total_contours = len(contours)
+        orange_pixels = np.sum(mask > 0)
+        
         # Filter contours by area - reduced minimum area to detect smaller balls (radius ~7 or smaller)
         filtered_contours = [x for x in contours if cv2.contourArea(x) > 20 and cv2.contourArea(x) < 30000]
+        
+        # Debug: Print detection info
+        print(f"🔍 CAMERA DEBUG: Found {total_contours} contours, {orange_pixels} orange pixels, {len(filtered_contours)} filtered")
        
+        ball_detected = False
         if filtered_contours:
             largest_contour = max(filtered_contours, key=cv2.contourArea)
             (x, y), radius = cv2.minEnclosingCircle(largest_contour)
@@ -70,19 +88,41 @@ class CameraWebServer:
             center = (int(x), int(y))
             radius = int(radius)
             area = cv2.contourArea(largest_contour)
+            
+            ball_detected = True
+            
+            # Update detection state
+            self.ball_detected = True
+            self.ball_center = center
+            self.ball_radius = radius
+            self.ball_area = area
+            self.orange_pixels = orange_pixels
+            self.total_contours = total_contours
+            self.filtered_contours = len(filtered_contours)
+            self.last_detection_time = time.time()
            
             # Print ball area for debugging
-            print(f"Ball detected - Area: {area:.1f}, Center: ({center[0]}, {center[1]}), Radius: {radius}")
+            print(f"✅ BALL DETECTED - Area: {area:.1f}, Center: ({center[0]}, {center[1]}), Radius: {radius}")
            
             # Draw circle around detected ball
             cv2.circle(display_frame, center, radius, (0, 255, 0), 2)
             cv2.circle(display_frame, center, 2, (0, 255, 0), -1)
            
             # Add text label with area information
-            cv2.putText(display_frame, f"Ball: ({center[0]}, {center[1]}) Area: {area:.0f}",
+            cv2.putText(display_frame, f"BALL DETECTED: ({center[0]}, {center[1]}) Area: {area:.0f}",
                        (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 0), 2)
         else:
-            cv2.putText(display_frame, "No ball detected",
+            # Update detection state
+            self.ball_detected = False
+            self.ball_center = None
+            self.ball_radius = 0
+            self.ball_area = 0
+            self.orange_pixels = orange_pixels
+            self.total_contours = total_contours
+            self.filtered_contours = 0
+            
+            print(f"❌ NO BALL DETECTED - {total_contours} contours, {orange_pixels} orange pixels")
+            cv2.putText(display_frame, "NO BALL DETECTED",
                        (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 0, 0), 2)
        
         # Add center crosshair
@@ -90,6 +130,10 @@ class CameraWebServer:
         center_x, center_y = width // 2, height // 2
         cv2.line(display_frame, (center_x - 20, center_y), (center_x + 20, center_y), (255, 255, 255), 1)
         cv2.line(display_frame, (center_x, center_y - 20), (center_x, center_y + 20), (255, 255, 255), 1)
+        
+        # Add debug info to frame
+        cv2.putText(display_frame, f"Contours: {total_contours}, Orange: {orange_pixels}",
+                   (10, 60), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1)
        
         return display_frame
    
@@ -117,6 +161,20 @@ class CameraWebServer:
         def video_feed():
             return Response(self._generate_frames(),
                           mimetype='multipart/x-mixed-replace; boundary=frame')
+        
+        @self.app.route('/detection_data')
+        def detection_data():
+            return jsonify({
+                'ball_detected': self.ball_detected,
+                'ball_center': self.ball_center,
+                'ball_radius': self.ball_radius,
+                'ball_area': self.ball_area,
+                'orange_pixels': self.orange_pixels,
+                'total_contours': self.total_contours,
+                'filtered_contours': self.filtered_contours,
+                'last_detection_time': self.last_detection_time,
+                'frame_center': (320, 240)
+            })
    
     def run(self, host='0.0.0.0', port=5000, debug=False):
         """Run the web server"""

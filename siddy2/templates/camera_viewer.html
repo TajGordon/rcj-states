@@ -351,6 +351,25 @@
                             <div class="stat-label">Last Seen</div>
                         </div>
                     </div>
+                    
+                    <div class="data-grid" style="margin-top: 20px;">
+                        <div class="data-item">
+                            <div class="data-label">Orange Pixels</div>
+                            <div class="data-value" id="orange-pixels">0</div>
+                        </div>
+                        <div class="data-item">
+                            <div class="data-label">Total Contours</div>
+                            <div class="data-value" id="total-contours">0</div>
+                        </div>
+                        <div class="data-item">
+                            <div class="data-label">Filtered Contours</div>
+                            <div class="data-value" id="filtered-contours">0</div>
+                        </div>
+                        <div class="data-item">
+                            <div class="data-label">Detection Rate</div>
+                            <div class="data-value" id="detection-rate">0%</div>
+                        </div>
+                    </div>
                 </div>
                 
                 <div class="info-card">
@@ -379,6 +398,8 @@
         let lastDetectionTime = null;
         let frameCount = 0;
         let fpsStartTime = Date.now();
+        let totalFrames = 0;
+        let detectedFrames = 0;
         
         // Initialize the interface
         function init() {
@@ -407,24 +428,37 @@
             fpsStartTime = now;
         }
         
-        // Simulate ball detection data (since the server doesn't provide JSON endpoint)
-        function simulateDetectionData() {
-            // This simulates what would come from a real detection API
-            const ballDetected = Math.random() > 0.7; // 30% chance of detection
-            
-            if (ballDetected) {
-                const ballX = Math.floor(Math.random() * 640);
-                const ballY = Math.floor(Math.random() * 480);
-                const radius = Math.floor(Math.random() * 50) + 10;
-                const area = Math.floor(Math.PI * radius * radius);
-                
-                updateBallDetection(true, ballX, ballY, radius, area);
-                lastDetectionTime = new Date();
-            } else {
-                updateBallDetection(false);
-            }
-            
-            frameCount++;
+        // Get real ball detection data from server
+        function getDetectionData() {
+            fetch('/detection_data')
+                .then(response => response.json())
+                .then(data => {
+                    if (data.ball_detected) {
+                        updateBallDetection(true, data.ball_center[0], data.ball_center[1], 
+                                          data.ball_radius, data.ball_area);
+                        lastDetectionTime = new Date(data.last_detection_time * 1000);
+                        detectedFrames++;
+                    } else {
+                        updateBallDetection(false);
+                    }
+                    
+                    // Update additional stats
+                    document.getElementById('orange-pixels').textContent = data.orange_pixels;
+                    document.getElementById('total-contours').textContent = data.total_contours;
+                    document.getElementById('filtered-contours').textContent = data.filtered_contours;
+                    
+                    // Update detection rate
+                    totalFrames++;
+                    const detectionRate = totalFrames > 0 ? Math.round((detectedFrames / totalFrames) * 100) : 0;
+                    document.getElementById('detection-rate').textContent = detectionRate + '%';
+                    
+                    frameCount++;
+                })
+                .catch(error => {
+                    console.error('Error fetching detection data:', error);
+                    // Fallback to no detection
+                    updateBallDetection(false);
+                });
         }
         
         // Update ball detection display
@@ -493,6 +527,7 @@
         
         function refreshData() {
             console.log('Refreshing data...');
+            getDetectionData();
             // Force refresh the video stream
             const videoStream = document.querySelector('.video-stream');
             const currentSrc = videoStream.src;
@@ -521,8 +556,8 @@
             const videoStream = document.querySelector('.video-stream');
             videoStream.addEventListener('error', handleVideoError);
             
-            // Simulate detection data updates (remove this in production)
-            // setInterval(simulateDetectionData, 100);
+            // Get real detection data updates
+            setInterval(getDetectionData, 100);
         });
         
         // Handle page visibility changes
