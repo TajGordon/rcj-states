@@ -31,14 +31,14 @@ class SoccerRobot:
         self.lower_orange = np.array([0,50,30])  # More inclusive lower bound
         self.upper_orange = np.array([25,255,255])  # More inclusive upper bound
        
-        # Define speed parameters before setup_motors() is called
-        self.max_speed = 250000000  # Maximum speed for all movements
-        self.kp_turn = 1.5  # Turn sensitivity multiplier (increased for tighter turns)
-        self.kp_forward = 0.5  # Forward movement sensitivity multiplier
-        self.turn_threshold = 0.3  # Minimum error to start turning (reduces jitter)
-        self.tight_turn_factor = 0.6  # Reduce forward speed during turns for tighter turning
-        self.pure_turn_threshold = 0.4  # Error threshold for pure turning in place (no forward movement)
-        self.nonlinear_turn_power = 0.8  # Power for nonlinear turning (0.5 = square root, 1.0 = linear)
+        # Optimal speed parameters for best performance
+        self.max_speed = 180000000  # Maximum speed for all movements (optimal balance)
+        self.kp_turn = 1.8  # Turn sensitivity multiplier (responsive but stable)
+        self.kp_forward = 0.7  # Forward movement sensitivity multiplier (good speed)
+        self.turn_threshold = 0.05  # Minimum error to start turning (reduces jitter, responsive)
+        self.tight_turn_factor = 0.5  # Reduce forward speed during turns for tighter turning
+        self.pure_turn_threshold = 0.15  # Error threshold for pure turning in place (balanced)
+        self.nonlinear_turn_power = 0.6  # Power for nonlinear turning (smooth square root response)
        
         self.i2c = busio.I2C(board.SCL, board.SDA)
         self.motors = []

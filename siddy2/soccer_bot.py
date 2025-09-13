@@ -30,21 +30,21 @@ class SoccerRobot:
         self.lower_orange = np.array([0,132,61]) #[0,132,61]
         self.upper_orange = np.array([14,255,255]) #[14,255,255]
        
-        # Define speed parameters - optimized for good performance
-        self.max_speed = 120000000  # Maximum speed for all movements (good balance)
-        self.kp_turn = 1.2  # Turn sensitivity multiplier (fast but not crazy)
-        self.kp_forward = 0.8  # Forward movement sensitivity multiplier (good speed)
-        self.turn_threshold = 0.02  # Minimum error to start turning (responsive but not jittery)
-        self.tight_turn_factor = 0.4  # Reduce forward speed during turns (good turning)
-        self.pure_turn_threshold = 0.1  # Error threshold for pure turning in place
-        self.nonlinear_turn_power = 0.5  # Power for nonlinear turning (smooth response)
+        # Optimal speed parameters for best performance
+        self.max_speed = 150000000  # Maximum speed for all movements (optimal balance)
+        self.kp_turn = 1.6  # Turn sensitivity multiplier (responsive but stable)
+        self.kp_forward = 0.75  # Forward movement sensitivity multiplier (good speed)
+        self.turn_threshold = 0.03  # Minimum error to start turning (responsive but not jittery)
+        self.tight_turn_factor = 0.45  # Reduce forward speed during turns (good turning)
+        self.pure_turn_threshold = 0.12  # Error threshold for pure turning in place
+        self.nonlinear_turn_power = 0.55  # Power for nonlinear turning (smooth response)
         
         # Enhanced response parameters
-        self.turn_acceleration_factor = 1.2  # How quickly turning ramps up
-        self.turn_deceleration_factor = 0.9  # How quickly turning ramps down
+        self.turn_acceleration_factor = 1.3  # How quickly turning ramps up
+        self.turn_deceleration_factor = 0.85  # How quickly turning ramps down
         self.dynamic_turn_scaling = True  # Enable dynamic turn scaling based on ball distance
-        self.min_turn_speed = 0.2  # Minimum turn speed as fraction of max
-        self.max_turn_speed = 0.8  # Maximum turn speed as fraction of max
+        self.min_turn_speed = 0.25  # Minimum turn speed as fraction of max
+        self.max_turn_speed = 0.85  # Maximum turn speed as fraction of max
        
         self.i2c = busio.I2C(board.SCL, board.SDA)
         self.motors = []
@@ -331,7 +331,7 @@ class SoccerRobot:
     def calculate_search_commands(self):
         """Calculate motor commands for searching when no ball is detected."""
         # Turn left to search for ball
-        turn_speed = self.max_speed * 0.25  # 25% of max speed for searching (good balance)
+        turn_speed = self.max_speed * 0.3  # 30% of max speed for searching (optimal balance)
         
         # Left turn: left motors backward, right motors forward
         # Back-left motor (25): backward (INVERTED)
