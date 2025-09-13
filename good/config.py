@@ -6,10 +6,10 @@ hostname = socket.gethostname()
 if hostname == 'storm':
     print('running on taj\'s bot')
     target_goal = 'blue'
-    # Motor addresses matching soccer_bot.py: [27-back left, 28-back right, 30-front left, 26-front right]
+    # front left: 26, front right: 27, back right: 29, back left: 25
     # Motor addresses in order: [back_left, back_right, front_left, front_right]
-    motor_addresses = [27, 28, 30, 26]  # [bl, br, fl, fr] - MATCHING SOCCER_BOT
-    motor_addresses_named = {'fl': 30, 'fr': 26, 'bl': 27, 'br': 28}
+    motor_addresses = [25, 29, 26, 27]  # [bl, br, fl, fr]
+    motor_addresses_named = {'fl': 26, 'fr': 27, 'bl': 25, 'br': 29}
     # idk if these get used
     # SINCOSCENTRE = {25: 1260, 26: 1250, 27: 1219, 29: 1256}
     # ELECANGLEOFFSET = {25: 1452253440, 26: 1167990784, 27: 1478825728, 29: 1547735552}
@@ -77,10 +77,9 @@ if hostname == 'storm':
 else:
     print(f'running on {hostname}, using default configuration')
     # Default configuration for development/testing
-    # Motor addresses matching soccer_bot.py: [27-back left, 28-back right, 30-front left, 26-front right]
     # Motor addresses in order: [back_left, back_right, front_left, front_right]
-    motor_addresses = [27, 28, 30, 26]  # [bl, br, fl, fr] - MATCHING SOCCER_BOT
-    motor_addresses_named = {'fl': 30, 'fr': 26, 'bl': 27, 'br': 28}
+    motor_addresses = [25, 29, 26, 27]  # [bl, br, fl, fr]
+    motor_addresses_named = {'fl': 26, 'fr': 27, 'bl': 25, 'br': 29}
     
     # Default TOF configuration
     tof_count = 8
