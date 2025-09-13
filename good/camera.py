@@ -86,6 +86,15 @@ def camera_process(ball_position, ball_radius, ball_angle, ball_detected, stop_e
                         mask = cv2.inRange(hsv_frame, lower, upper)
                         combined_mask = cv2.bitwise_or(combined_mask, mask)
                 
+                # Create circular mask to exclude robot area in center
+                # Robot is in the center, so exclude a circular area around center
+                robot_mask_radius = 80  # Radius of area to exclude (adjust as needed)
+                robot_mask = np.zeros(combined_mask.shape, dtype=np.uint8)
+                cv2.circle(robot_mask, (camera_center_x, camera_center_y), robot_mask_radius, 255, -1)
+                
+                # Apply robot mask to exclude center area from ball detection
+                combined_mask = cv2.bitwise_and(combined_mask, cv2.bitwise_not(robot_mask))
+                
                 # Apply morphological operations to clean up the mask
                 kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (5, 5))
                 combined_mask = cv2.morphologyEx(combined_mask, cv2.MORPH_OPEN, kernel)
@@ -167,6 +176,12 @@ def camera_process(ball_position, ball_radius, ball_angle, ball_detected, stop_e
                         cv2.putText(display_frame, f"Ball: ({center[0]}, {center[1]})", 
                                    (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 0), 2)
                         
+                        # Draw robot exclusion area for visualization
+                        cv2.circle(display_frame, (camera_center_x, camera_center_y), robot_mask_radius, (255, 0, 0), 2)
+                        cv2.putText(display_frame, "Robot Area", 
+                                   (camera_center_x - 40, camera_center_y - robot_mask_radius - 10), 
+                                   cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 0, 0), 1)
+                        
                         # Try to put frame in queue (non-blocking)
                         try:
                             frame_queue.put_nowait(display_frame)
@@ -186,6 +201,12 @@ def camera_process(ball_position, ball_radius, ball_angle, ball_detected, stop_e
                         display_frame = frame.copy()
                         cv2.putText(display_frame, "No ball detected", 
                                    (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 0, 0), 2)
+                        
+                        # Draw robot exclusion area for visualization
+                        cv2.circle(display_frame, (camera_center_x, camera_center_y), robot_mask_radius, (255, 0, 0), 2)
+                        cv2.putText(display_frame, "Robot Area", 
+                                   (camera_center_x - 40, camera_center_y - robot_mask_radius - 10), 
+                                   cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 0, 0), 1)
                         try:
                             frame_queue.put_nowait(display_frame)
                         except:
